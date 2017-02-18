@@ -7,12 +7,14 @@
 #include <memory.h>
 
 
-unsigned short reg[8];
-unsigned short mem[32768];
-unsigned short pc;
+typedef unsigned short word;
+
+word reg[8];
+word mem[32768];
+word pc;
 
 
-unsigned short value(unsigned short v)
+word value(word v)
 {
 	if (v < 32768)
 	{
@@ -28,11 +30,28 @@ unsigned short value(unsigned short v)
 	return 0;
 }
 
+void store(word v, word dest)
+{
+	if (dest < 32768)
+	{
+		mem[dest] = v & 32767;
+	}
+	else if (dest < 32776)
+	{
+		reg[dest - 32768] = v & 32767;
+	}
+	else
+	{
+		printf("ERR! unallowed destination! [pc:%04d = %d]\n", pc, v);
+	}
+
+}
+
 void start()
 {
 	pc = 0;
 
-	unsigned short a, b, c, i;
+	word a, b, c, i;
 	
 	unsigned int active = 1;
 	while (active)
@@ -42,8 +61,11 @@ void start()
 		switch (i)
 		{
 			case 0: // halt 0
+			{
 				active = 0;
+
 				break;
+			}
 
 			case 9: // add 9 a b c
 			{
@@ -51,16 +73,7 @@ void start()
 				b = mem[pc++];
 				c = mem[pc++];
 
-				unsigned short tmp = value(b) + value(c);
-
-				if (a < 32768)
-				{
-					mem[a] = tmp & 32767;
-				}
-				else if (a < 32776)
-				{
-					reg[a - 32768] = tmp & 32767;
-				}
+				store((value(b) + value(c)) % 32767, a);
 			
 				break;
 			}
@@ -68,7 +81,8 @@ void start()
 			case 19: // out 19 a
 			{
 				a = mem[pc++];
-				printf("%d\n", value(a));
+
+				printf("%d", value(a));
 
 				break;
 			}
@@ -77,16 +91,21 @@ void start()
 				break;
 
 			default:
+			{
 				printf("ERR! unrecognized instruction! [pc:%04d = %d]\n", pc, i);
+
 				break;
+			}
 		}
 	}
+
+	printf("\n");
 }
 
 
 int main(int argc, const char *argv[])
 {
-	unsigned short prg[] = { 9, 32768, 32769, 4, 19, 32768 };
+	word prg[] = { 9, 32768, 32769, 4, 19, 32768 };
 
 	memcpy(mem, prg, sizeof(prg));
 	start();
