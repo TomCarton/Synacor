@@ -60,14 +60,14 @@ void start()
 
 		switch (i)
 		{
-			case 0: // halt 0
+			case 0: // halt: 0
 			{
 				active = 0;
 
 				break;
 			}
 
-			case 9: // add 9 a b c
+			case 9: // add: 9 a b c
 			{
 				a = mem[pc++];
 				b = mem[pc++];
@@ -78,7 +78,39 @@ void start()
 				break;
 			}
 
-			case 19: // out 19 a
+			case 12: // and: 12 a b c
+			{
+				a = mem[pc++];
+				b = mem[pc++];
+				c = mem[pc++];
+
+				store(value(b) & value(c), a);
+
+				break;
+			}
+
+			case 13: // or: 12 a b c
+			{
+				a = mem[pc++];
+				b = mem[pc++];
+				c = mem[pc++];
+
+				store(value(b) | value(c), a);
+
+				break;
+			}
+
+			case 14: // not: 14 a b
+			{
+				a = mem[pc++];
+				b = mem[pc++];
+
+				store(~value(b), a);
+
+				break;
+			}
+
+			case 19: // out: 19 a
 			{
 				a = mem[pc++];
 
@@ -87,7 +119,7 @@ void start()
 				break;
 			}
 
-			case 21: // noop 21
+			case 21: // noop: 21
 				break;
 
 			default:
