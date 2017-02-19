@@ -15,10 +15,15 @@ typedef unsigned short word;
 typedef unsigned char byte;
 
 static const unsigned int memsize = 1 << 15;
-byte mem[memsize];
+static const unsigned int stacksize = 1 << 15;
 
 word reg[8];
+
+word mem[memsize];
 word pc;
+
+word stack[stacksize];
+word sp;
 
 word a, b, c;
 
@@ -35,21 +40,13 @@ void setup()
     a = b = c = 0;
 }
 
-word readWord(unsigned int index)
-{
-    word i = mem[index + 1];
-    i = (i << 8) + mem[index + 0];
-
-    return i;
-}
-
 word value(word v)
 {
-	if ((v & (2 << 15)) == 0)
+	if (v < 32768)
 	{
 		return v;
 	}
-	else if (v - (2 << 15) < 8)
+	else if (v - 32768 < 8)
 	{
 		return reg[v & 7];
 	}
@@ -83,11 +80,11 @@ void dumpInstruction(const unsigned int addr, const char *inst, const unsigned i
 	va_list ap;
 
 	// memory
-	unsigned int p = addr - (count * sizeof(word)) - 2;
+	unsigned int p = addr - count - 1;
 	fprintf(stderr, "  %08d: %04X", p, mem[p]);
 	for (unsigned int i = 0; i < count; ++i)
 	{
-		fprintf(stderr, " %04X", mem[p + (i + 1) * sizeof(word)]);
+		fprintf(stderr, " %04X", mem[p + i + 1]);
 	}
 
 	// instruction
@@ -127,7 +124,7 @@ void run()
 	bool active = true;
 	while (active)
 	{
-        word i = readWord(pc); pc += 2;
+        word i = mem[pc++];
 
 		switch (i)
 		{
@@ -144,8 +141,8 @@ void run()
 
 			case 1: // set: 1 a b
 			{
-				a = readWord(pc); pc += 2;
-				b = readWord(pc); pc += 2;
+				a = mem[pc++];
+				b = mem[pc++];
 
 				if (debug) dumpInstruction(pc, "SET", 2, a, b);
 
@@ -156,9 +153,9 @@ void run()
 
 			case 4: // eq: 4 a b c
 			{
-				a = readWord(pc); pc += 2;
-				b = readWord(pc); pc += 2;
-				c = readWord(pc); pc += 2;
+				a = mem[pc++];
+				b = mem[pc++];
+				c = mem[pc++];
 
 				if (debug) dumpInstruction(pc, "EQ", 3, a, b, c);
 
@@ -167,25 +164,19 @@ void run()
 				break;
 			}
 
-			case 6: // jump: 6 a
+			case 6: // jmp: 6 a
 			{
-				a = readWord(pc); pc += 2;
+				a = mem[pc++];
 
-				if (debug) dumpInstruction(pc, "JUMP", 1, a);
+				if (debug) dumpInstruction(pc, "JMP", 1, a);
 
 				if (a < memsize)
 				{
-					if (a & 1)
-					{
-						fprintf(stderr, ">>WARN! invalid JUMP address! [pc:%04d = %d]\n", pc, a);
-                        // break;
-					}
-
 					pc = a;
 				}
 				else
 				{
-					fprintf(stderr, ">>ERR! invalid JUMP address! [pc:%04d = %d]\n", pc, a);
+					fprintf(stderr, ">>ERR! invalid JMP address! [pc:%04d = %d]\n", pc, a);
 				}
 
 				break;
@@ -193,8 +184,8 @@ void run()
 
 			case 7: // jt: 7 a b
 			{
-				a = readWord(pc); pc += 2;
-				b = readWord(pc); pc += 2;
+				a = mem[pc++];
+				b = mem[pc++];
 
                 if (debug) dumpInstruction(pc, "JT", 2, a, b);
 
@@ -215,8 +206,8 @@ void run()
 
 			case 8: // jf: 8 a b
 			{
-				a = readWord(pc); pc += 2;
-				b = readWord(pc); pc += 2;
+				a = mem[pc++];
+				b = mem[pc++];
 
                 if (debug) dumpInstruction(pc, "JF", 2, a, b);
 
@@ -237,9 +228,9 @@ void run()
 
 			case 9: // add: 9 a b c
 			{
-				a = readWord(pc); pc += 2;
-				b = readWord(pc); pc += 2;
-				c = readWord(pc); pc += 2;
+				a = mem[pc++];
+				b = mem[pc++];
+				c = mem[pc++];
 
                 if (debug) dumpInstruction(pc, "ADD", 3, a, b, c);
 
@@ -250,9 +241,9 @@ void run()
 
 			case 12: // and: 12 a b c
 			{
-				a = readWord(pc); pc += 2;
-				b = readWord(pc); pc += 2;
-				c = readWord(pc); pc += 2;
+				a = mem[pc++];
+				b = mem[pc++];
+				c = mem[pc++];
 
                 if (debug) dumpInstruction(pc, "AND", 3, a, b, c);
 
@@ -263,9 +254,9 @@ void run()
 
 			case 13: // or: 12 a b c
 			{
-				a = readWord(pc); pc += 2;
-				b = readWord(pc); pc += 2;
-				c = readWord(pc); pc += 2;
+				a = mem[pc++];
+				b = mem[pc++];
+				c = mem[pc++];
 
                 if (debug) dumpInstruction(pc, "OR", 3, a, b, c);
 
@@ -276,8 +267,8 @@ void run()
 
 			case 14: // not: 14 a b
 			{
-				a = readWord(pc); pc += 2;
-				b = readWord(pc); pc += 2;
+				a = mem[pc++];
+				b = mem[pc++];
 
                 if (debug) dumpInstruction(pc, "NOT", 2, a, b);
 
@@ -289,7 +280,7 @@ void run()
 
 			case 19: // out: 19 a
 			{
-				a = readWord(pc); pc += 2;
+				a = mem[pc++];
 
 				if (debug) dumpInstruction(pc, "OUT", 1, a);
 
