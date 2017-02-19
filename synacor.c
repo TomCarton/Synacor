@@ -27,7 +27,7 @@ word value(word v)
 		return reg[v - 32768];
 	}
 
-	printf("\n\n>>ERR! unallowed value! [pc:%04d = %d]\n\n", pc, v);
+	fprintf(stderr, ">>ERR! unallowed value! [pc:%04d = %d]\n", pc, v);
 
 	return 0;
 }
@@ -44,7 +44,7 @@ void store(word v, word dest)
 	}
 	else
 	{
-		printf("\n\n>>ERR! unallowed destination! [pc:%04d = %d]\n\n", pc, v);
+		fprintf(stderr, ">>ERR! unallowed destination! [pc:%04d = %d]\n", pc, v);
 	}
 }
 
@@ -62,7 +62,7 @@ void run()
 			{
 				active = 0;
 
-				printf("\n\n>>Program ended. [pc:%04d = %d]\n\n", pc, mem[pc - 1]);
+				fprintf(stderr, ">>HALT: Program ended. [pc:%04d = %d]\n", pc, mem[pc - 1]);
 
 				break;
 			}
@@ -77,7 +77,7 @@ void run()
 				}
 				else
 				{
-					printf("\n\n>>ERR! invalid JUMP address! [pc:%04d = %d]\n\n", pc, a);
+					fprintf(stderr, "\n\n>>ERR! invalid JUMP address! [pc:%04d = %d]\n", pc, a);
 				}
 
 				break;
@@ -96,7 +96,7 @@ void run()
 					}
 					else
 					{
-						printf("\n\n>>ERR! invalid JT address! [pc:%04d = %d]\n\n", pc, b);
+						fprintf(stderr, ">>ERR! invalid JT address! [pc:%04d = %d]\n", pc, b);
 					}
 				}
 
@@ -116,7 +116,7 @@ void run()
 					}
 					else
 					{
-						printf("\n\n>>ERR! invalid JT address! [pc:%04d = %d]\n\n", pc, b);
+						fprintf(stderr, ">>ERR! invalid JT address! [pc:%04d = %d]\n", pc, b);
 					}
 				}
 
@@ -170,7 +170,7 @@ void run()
 			{
 				a = mem[pc++];
 
-				printf("%d", value(a));
+				fprintf(stdout, "%d", value(a));
 
 				break;
 			}
@@ -182,7 +182,7 @@ void run()
 
 			default:
 			{
-				printf("\n\n>>ERR! unrecognized instruction! [pc:%04d = %d]\n\n", pc, mem[pc - 1]);
+				fprintf(stderr, ">>ERR! unrecognized instruction! [pc:%04d = %d]\n", pc, mem[pc - 1]);
 
 				break;
 			}
@@ -192,26 +192,35 @@ void run()
 	printf("\n");
 }
 
+int readFile(const char *filename)
+{
+	FILE *f = NULL;
+    if (!(f = fopen(filename, "r")))
+    {
+        fprintf(stderr, ">>ERR! failed to open `%s' for reading\n", filename);
+        return -1;
+    }
+
+	int sizeread = fread(mem, 2, 32768, f);
+
+    fclose(f);
+
+    return sizeread;
+}
 
 int main(int argc, const char *argv[])
 {
 	if (argc != 2)
     	goto usage;
 
-    FILE *f = NULL;
-    if (!(f = fopen(argv[1], "r")))
-    {
-        fprintf(stderr, "\n\n>>ERR! failed to open `%s' for reading\n\n", argv[1]);
-        return 1;
-    }
+	if (readFile(argv[1]) > 0)
+	{
+		run();
 
-	int clen = fread(mem, 2, 32768, f);
+		return 0;
+	}
 
-    fclose(f);
-
-	run();
-
-	return 0;
+	return 1;
 
 usage:
     fprintf(stderr, "\n");
