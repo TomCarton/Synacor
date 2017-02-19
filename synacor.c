@@ -11,7 +11,9 @@ typedef unsigned short word;
 
 word reg[8];
 word mem[32768];
+
 word pc;
+word a, b, c;
 
 
 word value(word v)
@@ -44,37 +46,24 @@ void store(word v, word dest)
 	{
 		printf("\n\n>>ERR! unallowed destination! [pc:%04d = %d]\n\n", pc, v);
 	}
-
 }
 
-void start()
+void run()
 {
 	pc = 0;
 
-	word a, b, c, i;
 	
 	unsigned int active = 1;
 	while (active)
 	{
-		i = mem[pc++];
-
-		switch (i)
+		switch (mem[pc++])
 		{
 			case 0: // halt: 0
 			{
 				active = 0;
 
-				break;
-			}
+				printf("\n\n>>Program ended. [pc:%04d = %d]\n\n", pc, mem[pc - 1]);
 
-			case 9: // add: 9 a b c
-			{
-				a = mem[pc++];
-				b = mem[pc++];
-				c = mem[pc++];
-
-				store((value(b) + value(c)) % 32767, a);
-			
 				break;
 			}
 
@@ -134,6 +123,17 @@ void start()
 				break;
 			}
 
+			case 9: // add: 9 a b c
+			{
+				a = mem[pc++];
+				b = mem[pc++];
+				c = mem[pc++];
+
+				store((value(b) + value(c)) % 32767, a);
+			
+				break;
+			}
+
 			case 12: // and: 12 a b c
 			{
 				a = mem[pc++];
@@ -176,11 +176,13 @@ void start()
 			}
 
 			case 21: // noop: 21
+			{
 				break;
+			}
 
 			default:
 			{
-				printf("\n\n>>ERR! unrecognized instruction! [pc:%04d = %d]\n\n", pc, i);
+				printf("\n\n>>ERR! unrecognized instruction! [pc:%04d = %d]\n\n", pc, mem[pc - 1]);
 
 				break;
 			}
@@ -203,11 +205,11 @@ int main(int argc, const char *argv[])
         return 1;
     }
 
-	int clen = fread(mem, 2, 16384, f);
+	int clen = fread(mem, 2, 32768, f);
 
     fclose(f);
 
-	start();
+	run();
 
 	return 0;
 
