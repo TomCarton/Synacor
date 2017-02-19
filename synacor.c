@@ -25,7 +25,7 @@ word value(word v)
 		return reg[v - 32768];
 	}
 
-	printf("ERR! unallowed value! [pc:%04d = %d]\n", pc, v);
+	printf("\n\n>>ERR! unallowed value! [pc:%04d = %d]\n\n", pc, v);
 
 	return 0;
 }
@@ -42,7 +42,7 @@ void store(word v, word dest)
 	}
 	else
 	{
-		printf("ERR! unallowed destination! [pc:%04d = %d]\n", pc, v);
+		printf("\n\n>>ERR! unallowed destination! [pc:%04d = %d]\n\n", pc, v);
 	}
 
 }
@@ -75,6 +75,62 @@ void start()
 
 				store((value(b) + value(c)) % 32767, a);
 			
+				break;
+			}
+
+			case 6: // jump: 6 a
+			{
+				a = mem[pc++];
+
+				if (a < 32768)
+				{
+					pc = a;
+				}
+				else
+				{
+					printf("\n\n>>ERR! invalid JUMP address! [pc:%04d = %d]\n\n", pc, a);
+				}
+
+				break;
+			}
+
+			case 7: // jt: 7 a b
+			{
+				a = mem[pc++];
+				b = mem[pc++];
+
+				if (a)
+				{
+					if (b < 32768)
+					{
+						pc = b;
+					}
+					else
+					{
+						printf("\n\n>>ERR! invalid JT address! [pc:%04d = %d]\n\n", pc, b);
+					}
+				}
+
+				break;
+			}
+
+			case 8: // jf: 8 a b
+			{
+				a = mem[pc++];
+				b = mem[pc++];
+
+				if (a == 0)
+				{
+					if (b < 32768)
+					{
+						pc = b;
+					}
+					else
+					{
+						printf("\n\n>>ERR! invalid JT address! [pc:%04d = %d]\n\n", pc, b);
+					}
+				}
+
 				break;
 			}
 
@@ -124,7 +180,7 @@ void start()
 
 			default:
 			{
-				printf("ERR! unrecognized instruction! [pc:%04d = %d]\n", pc, i);
+				printf("\n\n>>ERR! unrecognized instruction! [pc:%04d = %d]\n\n", pc, i);
 
 				break;
 			}
@@ -137,10 +193,36 @@ void start()
 
 int main(int argc, const char *argv[])
 {
-	word prg[] = { 9, 32768, 32769, 4, 19, 32768 };
+	if (argc != 2)
+    	goto usage;
 
-	memcpy(mem, prg, sizeof(prg));
+    FILE *f = NULL;
+    if (!(f = fopen(argv[1], "r")))
+    {
+        fprintf(stderr, "\n\n>>ERR! failed to open `%s' for reading\n\n", argv[1]);
+        return 1;
+    }
+
+	int clen = fread(mem, 2, 16384, f);
+
+    fclose(f);
+
 	start();
 
 	return 0;
+
+usage:
+    fprintf(stderr, "\n");
+    fprintf(stderr, "   Synacor\n");
+    fprintf(stderr, "   -------\n\n");
+
+    fprintf(stderr, "   usage:\n");
+    fprintf(stderr, "     %s path\n\n", argv[0]);
+
+    fprintf(stderr, "   example:\n");
+    fprintf(stderr, "     %s example.bin\n", argv[0]);
+
+    fprintf(stderr, "\n");
+
+    return 0;
 }
