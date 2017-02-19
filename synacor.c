@@ -3,16 +3,19 @@
 // written by Thomas CARTON
 //
 
-#include <memory.h>
 #include <stdbool.h>
-#include <stdio.h>
 #include <stdarg.h>
+#include <stdio.h>
+
+#include <memory.h>
+#include <limits.h>
 
 
 typedef unsigned short word;
+typedef unsigned char byte;
 
 word reg[8];
-word mem[32768];
+byte mem[32768];
 
 word pc;
 word a, b, c;
@@ -143,8 +146,7 @@ void run()
 					if (a & 1)
 					{
 						fprintf(stderr, ">>WARN! invalid JUMP address! [pc:%04d = %d]\n", pc, a);
-						a &= ~1;
-						break;
+						a += 1;
 					}
 
 					pc = a >> 1;
@@ -300,7 +302,9 @@ int readFile(const char *filename)
 
 int main(int argc, const char *argv[])
 {
-	if (argc < 2 || argc > 3)
+    char filename[PATH_MAX] = "\0";
+
+	if (argc < 2)
 	   	goto usage;
 
     // read parameters
@@ -317,16 +321,33 @@ int main(int argc, const char *argv[])
         {
             goto usage;
         }
+
+        // unknown parameter
+        else if (argv[i][0] == '-')
+        {
+		    fprintf(stderr, "\n!  Unknown parameter \"%s\"\n", argv[i]);
+
+            goto usage;
+        }
+
+        // input
+        else
+        {
+            strcpy(filename, argv[i]);
+        }
     }
 
-	if (readFile(argv[1]) > 0)
-	{
-		run();
+    if (filename[0] != '\0')
+    {
+		if (readFile(filename) > 0)
+		{
+			run();
 
-		return 0;
+			return 0;
+		}
+
+		return 1;
 	}
-
-	return 1;
 
 usage:
     fprintf(stderr, "\n");
@@ -338,7 +359,7 @@ usage:
 
     fprintf(stderr, "   parameters:\n");
     fprintf(stderr, "     -h, --help     - display this\n");
-    fprintf(stderr, "     -d, --debug     - enable debug\n\n");
+    fprintf(stderr, "     -d, --debug    - enable debug\n\n");
 
     fprintf(stderr, "   example:\n");
     fprintf(stderr, "     %s example.bin\n", argv[0]);
