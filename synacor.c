@@ -23,7 +23,7 @@ word mem[memsize];
 word pc;
 
 word stack[stacksize];
-word sp;
+word sp = stacksize;
 
 word a, b, c;
 
@@ -73,6 +73,16 @@ void store(word v, word dest)
 	{
 		fprintf(stderr, ">>ERR! unallowed destination! [pc:%04d = %d]\n", pc, v);
 	}
+}
+
+void push(word v)
+{
+    stack[--sp] = v;
+}
+
+word pop()
+{
+    return stack[sp++];
 }
 
 void dumpInstruction(const unsigned int addr, const char *inst, const unsigned int count, ...)
@@ -151,6 +161,28 @@ void run()
 				break;
 			}
 
+            case 2: // push: 2 a
+            {
+				a = mem[pc++];
+
+				if (debug) dumpInstruction(pc, "PUSH", 1, a);
+
+                push(value(a));
+
+                break;
+            }
+
+            case 3: // pop: 3 a
+            {
+				a = mem[pc++];
+
+				if (debug) dumpInstruction(pc, "POP", 1, a);
+
+                store(pop(), a);
+
+                break;
+            }
+
 			case 4: // eq: 4 a b c
 			{
 				a = mem[pc++];
@@ -159,10 +191,23 @@ void run()
 
 				if (debug) dumpInstruction(pc, "EQ", 3, a, b, c);
 
-				store(a, value(b) == value(c) ? 1 : 0);
+				store(value(b) == value(c) ? 1 : 0, a);
 
 				break;
 			}
+
+            case 5: // gt: 5 a b c
+			{
+				a = mem[pc++];
+				b = mem[pc++];
+				c = mem[pc++];
+
+				if (debug) dumpInstruction(pc, "GT", 3, a, b, c);
+
+				store(value(b) > value(c) ? 1 : 0, a);
+
+                break;
+            }
 
 			case 6: // jmp: 6 a
 			{
@@ -234,10 +279,36 @@ void run()
 
                 if (debug) dumpInstruction(pc, "ADD", 3, a, b, c);
 
-				store((value(b) + value(c)) % 32767, a);
+				store((unsigned int)value(b) + value(c), a);
 			
 				break;
 			}
+
+            case 10: // mult: 10 a b c
+            {
+				a = mem[pc++];
+				b = mem[pc++];
+				c = mem[pc++];
+
+                if (debug) dumpInstruction(pc, "MULT", 3, a, b, c);
+
+				store((unsigned int)value(b) * value(c), a);
+
+                break;
+            }
+
+            case 11: // mod: 11 a b c
+            {
+				a = mem[pc++];
+				b = mem[pc++];
+				c = mem[pc++];
+
+                if (debug) dumpInstruction(pc, "MOD", 3, a, b, c);
+
+				store((unsigned int)value(b) % value(c), a);
+
+                break;
+            }
 
 			case 12: // and: 12 a b c
 			{
@@ -278,6 +349,51 @@ void run()
 				break;
 			}
 
+			case 15: // rmem: 15 a b
+            {
+				a = mem[pc++];
+				b = mem[pc++];
+
+                if (debug) dumpInstruction(pc, "RMEM", 2, a, b);
+
+				store(mem[value(b)], a);
+
+				break;
+			}
+
+			case 16: // wmem: 16 a b
+			{
+				a = mem[pc++];
+				b = mem[pc++];
+
+                if (debug) dumpInstruction(pc, "WMEM", 2, a, b);
+
+                mem[value(a)] = value(b);
+
+				break;
+			}
+
+			case 17: // call: 17 a
+			{
+				a = mem[pc++];
+
+				if (debug) dumpInstruction(pc, "CALL", 1, a);
+
+                push(pc);
+                pc = value(a);
+
+                break;
+            }
+
+            case 18: // ret: 18
+            {
+				if (debug) dumpInstruction(pc, "RET", 0);
+
+                pc = pop();
+
+                break;
+            }
+
 			case 19: // out: 19 a
 			{
 				a = mem[pc++];
@@ -298,7 +414,7 @@ void run()
 
 			default:
 			{
-				fprintf(stderr, ">>ERR! unrecognized instruction! [pc:%04d = %d]\n", pc, mem[pc - 1]);
+				fprintf(stderr, ">>ERR! unrecognized instruction! [pc:%04d = %d]\n", pc - 1, mem[pc - 1]);
 				return;
 			}
 		}
