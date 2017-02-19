@@ -14,24 +14,44 @@
 typedef unsigned short word;
 typedef unsigned char byte;
 
-word reg[8];
-byte mem[32768];
+static const unsigned int memsize = 1 << 15;
+byte mem[memsize];
 
+word reg[8];
 word pc;
+
 word a, b, c;
 
 bool debug = false;
 
 
+void setup()
+{
+    memset(mem, 0, memsize);
+
+    memset(reg, 0, 8 * sizeof(word));
+    pc = 0;
+
+    a = b = c = 0;
+}
+
+word readWord(unsigned int index)
+{
+    word i = mem[index + 1];
+    i = (i << 8) + mem[index + 0];
+
+    return i;
+}
+
 word value(word v)
 {
-	if (v < 32768)
+	if ((v & (2 << 15)) == 0)
 	{
 		return v;
 	}
-	else if (v < 32776)
+	else if (v - (2 << 15) < 8)
 	{
-		return reg[v - 32768];
+		return reg[v & 7];
 	}
 
 	fprintf(stderr, ">>ERR! unallowed value! [pc:%04d = %d]\n", pc, v);
@@ -41,13 +61,16 @@ word value(word v)
 
 void store(word v, word dest)
 {
-	if (dest < 32768)
+    if (dest < memsize)
 	{
-		mem[dest] = v & 32767;
+        v &= 32767;
+
+		mem[dest + 0] = v & 0x00FF;
+		mem[dest + 1] = v & 0xFF00;
 	}
 	else if (dest < 32776)
 	{
-		reg[dest - 32768] = v & 32767;
+		reg[dest - memsize] = v & 32767;
 	}
 	else
 	{
@@ -60,11 +83,11 @@ void dumpInstruction(const unsigned int addr, const char *inst, const unsigned i
 	va_list ap;
 
 	// memory
-	unsigned int p = addr - count - 1;
-	fprintf(stderr, "\n%08X: %04X", p * (unsigned int)sizeof(word), mem[p]);
+	unsigned int p = addr - (count * sizeof(word)) - 2;
+	fprintf(stderr, "  %08d: %04X", p, mem[p]);
 	for (unsigned int i = 0; i < count; ++i)
 	{
-		fprintf(stderr, " %04X", mem[p + i]);
+		fprintf(stderr, " %04X", mem[p + (i + 1) * sizeof(word)]);
 	}
 
 	// instruction
@@ -78,26 +101,35 @@ void dumpInstruction(const unsigned int addr, const char *inst, const unsigned i
 	{
 		word o = va_arg(ap, int);
 
-		if (o < 32768)
+		if (o < memsize)
 		{
-			fprintf(stderr, " %d", o);
-		}
+            if (mem[p] == 19 && o > 31 && o <= 255)
+            {
+                fprintf(stderr, " '%c' (%d)", o, o);
+            }
+            else
+            {
+                fprintf(stderr, " %d", o);
+            }
+        }
 		else if (o < 32776)
 		{
 			fprintf(stderr, " r%d", o & 7);
 		}
 	}
 	va_end(ap);
+
+    fprintf(stderr, "\n");
 }
 
 void run()
 {
-	pc = 0;
-	
 	bool active = true;
 	while (active)
 	{
-		switch (mem[pc++])
+        word i = readWord(pc); pc += 2;
+
+		switch (i)
 		{
 			case 0: // halt: 0
 			{
@@ -112,8 +144,8 @@ void run()
 
 			case 1: // set: 1 a b
 			{
-				a = mem[pc++];
-				b = mem[pc++];
+				a = readWord(pc); pc += 2;
+				b = readWord(pc); pc += 2;
 
 				if (debug) dumpInstruction(pc, "SET", 2, a, b);
 
@@ -124,9 +156,9 @@ void run()
 
 			case 4: // eq: 4 a b c
 			{
-				a = mem[pc++];
-				b = mem[pc++];
-				c = mem[pc++];
+				a = readWord(pc); pc += 2;
+				b = readWord(pc); pc += 2;
+				c = readWord(pc); pc += 2;
 
 				if (debug) dumpInstruction(pc, "EQ", 3, a, b, c);
 
@@ -137,19 +169,19 @@ void run()
 
 			case 6: // jump: 6 a
 			{
-				a = mem[pc++];
+				a = readWord(pc); pc += 2;
 
 				if (debug) dumpInstruction(pc, "JUMP", 1, a);
 
-				if (a < 32768)
+				if (a < memsize)
 				{
 					if (a & 1)
 					{
 						fprintf(stderr, ">>WARN! invalid JUMP address! [pc:%04d = %d]\n", pc, a);
-						a += 1;
+                        // break;
 					}
 
-					pc = a >> 1;
+					pc = a;
 				}
 				else
 				{
@@ -161,14 +193,14 @@ void run()
 
 			case 7: // jt: 7 a b
 			{
-				a = mem[pc++];
-				b = mem[pc++];
+				a = readWord(pc); pc += 2;
+				b = readWord(pc); pc += 2;
 
                 if (debug) dumpInstruction(pc, "JT", 2, a, b);
 
 				if (value(a))
 				{
-					if (b < 32768)
+					if (b < memsize)
 					{
 						pc = b;
 					}
@@ -183,14 +215,14 @@ void run()
 
 			case 8: // jf: 8 a b
 			{
-				a = mem[pc++];
-				b = mem[pc++];
+				a = readWord(pc); pc += 2;
+				b = readWord(pc); pc += 2;
 
                 if (debug) dumpInstruction(pc, "JF", 2, a, b);
 
 				if (value(a) == 0)
 				{
-					if (b < 32768)
+					if (b < memsize)
 					{
 						pc = b;
 					}
@@ -205,9 +237,9 @@ void run()
 
 			case 9: // add: 9 a b c
 			{
-				a = mem[pc++];
-				b = mem[pc++];
-				c = mem[pc++];
+				a = readWord(pc); pc += 2;
+				b = readWord(pc); pc += 2;
+				c = readWord(pc); pc += 2;
 
                 if (debug) dumpInstruction(pc, "ADD", 3, a, b, c);
 
@@ -218,9 +250,9 @@ void run()
 
 			case 12: // and: 12 a b c
 			{
-				a = mem[pc++];
-				b = mem[pc++];
-				c = mem[pc++];
+				a = readWord(pc); pc += 2;
+				b = readWord(pc); pc += 2;
+				c = readWord(pc); pc += 2;
 
                 if (debug) dumpInstruction(pc, "AND", 3, a, b, c);
 
@@ -231,9 +263,9 @@ void run()
 
 			case 13: // or: 12 a b c
 			{
-				a = mem[pc++];
-				b = mem[pc++];
-				c = mem[pc++];
+				a = readWord(pc); pc += 2;
+				b = readWord(pc); pc += 2;
+				c = readWord(pc); pc += 2;
 
                 if (debug) dumpInstruction(pc, "OR", 3, a, b, c);
 
@@ -244,8 +276,8 @@ void run()
 
 			case 14: // not: 14 a b
 			{
-				a = mem[pc++];
-				b = mem[pc++];
+				a = readWord(pc); pc += 2;
+				b = readWord(pc); pc += 2;
 
                 if (debug) dumpInstruction(pc, "NOT", 2, a, b);
 
@@ -257,7 +289,7 @@ void run()
 
 			case 19: // out: 19 a
 			{
-				a = mem[pc++];
+				a = readWord(pc); pc += 2;
 
 				if (debug) dumpInstruction(pc, "OUT", 1, a);
 
@@ -293,7 +325,7 @@ int readFile(const char *filename)
         return -1;
     }
 
-	int sizeread = (int)fread(mem, 2, 32768, f);
+	int sizeread = (int)fread(mem, 1, 32768, f);
 
     fclose(f);
 
@@ -308,7 +340,7 @@ int main(int argc, const char *argv[])
 	   	goto usage;
 
     // read parameters
-    for (unsigned int i = 0; i < argc; ++i)
+    for (unsigned int i = 1; i < argc; ++i)
     {
         // debug
         if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--debug") == 0)
@@ -339,6 +371,8 @@ int main(int argc, const char *argv[])
 
     if (filename[0] != '\0')
     {
+        setup();
+
 		if (readFile(filename) > 0)
 		{
 			run();
