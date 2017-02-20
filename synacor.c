@@ -85,16 +85,44 @@ word pop()
     return stack[sp++];
 }
 
-void dumpInstruction(const unsigned int addr, const char *inst, const unsigned int count, ...)
+unsigned int dump(const unsigned int addr)
 {
-	va_list ap;
+    word i = mem[addr];
+
+    char inst[] = "???\0\0\0\0\0";
+    unsigned int count = 0;
+
+    switch (i)
+    {
+        case 0: strcpy(inst, "HALT"); count = 0; break;     // halt: 0
+        case 1: strcpy(inst, "SET"); count = 2; break;      // set:  1 a b
+        case 2: strcpy(inst, "PUSH"); count = 1; break;     // push: 2 a
+        case 3: strcpy(inst, "POP"); count = 1; break;      // pop: 3 a
+        case 4: strcpy(inst, "EQ"); count = 3; break;       // eq: 4 a b c
+        case 5: strcpy(inst, "GT"); count = 3; break;       // gt: 5 a b c
+        case 6: strcpy(inst, "JMP"); count = 1; break;      // jmp: 6 a
+        case 7: strcpy(inst, "JT"); count = 2; break;       // jt: 7 a b
+        case 8: strcpy(inst, "JF"); count = 2; break;       // jf: 8 a b
+        case 9: strcpy(inst, "ADD"); count = 3; break;      // add: 9 a b c
+        case 10: strcpy(inst, "MULT"); count = 3; break;    // mult: 10 a b c
+        case 11: strcpy(inst, "MOD"); count = 3; break;     // mod: 11 a b c
+        case 12: strcpy(inst, "AND"); count = 3; break;     // and: 12 a b c
+        case 13: strcpy(inst, "OR"); count = 3; break;      // or: 13 a b c
+        case 14: strcpy(inst, "NOT"); count = 2; break;     // not: 14 a b
+        case 15: strcpy(inst, "RMEM"); count = 2; break;    // rmem: 15 a b
+        case 16: strcpy(inst, "WMEM"); count = 2; break;    // wmem: 16 a b
+        case 17: strcpy(inst, "CALL"); count = 1; break;    // call: 17 a
+        case 18: strcpy(inst, "RET"); count = 0; break;     // ret: 18
+        case 19: strcpy(inst, "OUT"); count = 1; break;     // out: 19 a
+        case 20: strcpy(inst, "IN"); count = 1; break;      // in: 20 a
+        case 21: strcpy(inst, "NOOP"); count = 0; break;    // noop: 21
+    }
 
 	// memory
-	unsigned int p = addr - count - 1;
-	fprintf(stderr, "  %08d: %04X", p, mem[p]);
+	fprintf(stderr, "  %08d: %04X", addr, mem[addr]);
 	for (unsigned int i = 0; i < count; ++i)
 	{
-		fprintf(stderr, " %04X", mem[p + i + 1]);
+		fprintf(stderr, " %04X", mem[addr + i + 1]);
 	}
 
 	// instruction
@@ -103,14 +131,13 @@ void dumpInstruction(const unsigned int addr, const char *inst, const unsigned i
 	fprintf(stderr, "%s\t%s", pad, inst);
 
 	// operands
-	va_start(ap, count);
 	for (unsigned int i = 0; i < count; ++i)
 	{
-		word o = va_arg(ap, int);
+		word o = mem[addr + 1 + i];
 
 		if (o < memsize)
 		{
-            if (mem[p] == 19 && o > 31 && o <= 255)
+            if (mem[addr] == 19 && o > 31 && o <= 255)
             {
                 fprintf(stderr, " '%c' (%d)", o, o);
             }
@@ -124,9 +151,20 @@ void dumpInstruction(const unsigned int addr, const char *inst, const unsigned i
 			fprintf(stderr, " r%d", o & 7);
 		}
 	}
-	va_end(ap);
 
-    fprintf(stderr, "\n");
+	fprintf(stderr, "\n");
+
+    return count + 1;
+}
+
+void dumps(const unsigned int addr, unsigned int icount)
+{
+    unsigned int a = addr;
+
+    while (icount--)
+    {
+        a += dump(a);
+    }
 }
 
 void run()
@@ -134,14 +172,14 @@ void run()
 	bool active = true;
 	while (active)
 	{
+        if (debug) dump(pc);
+
         word i = mem[pc++];
 
 		switch (i)
 		{
 			case 0: // halt: 0
 			{
-				if (debug) dumpInstruction(pc, "HALT", 0);
-
 				active = false;
 
 				fprintf(stderr, ">>HALT: Program ended. [pc:%04d = %d]\n", pc, mem[pc - 1]);
@@ -154,8 +192,6 @@ void run()
 				a = mem[pc++];
 				b = mem[pc++];
 
-				if (debug) dumpInstruction(pc, "SET", 2, a, b);
-
 				store(b, a);
 
 				break;
@@ -165,8 +201,6 @@ void run()
             {
 				a = mem[pc++];
 
-				if (debug) dumpInstruction(pc, "PUSH", 1, a);
-
                 push(value(a));
 
                 break;
@@ -175,8 +209,6 @@ void run()
             case 3: // pop: 3 a
             {
 				a = mem[pc++];
-
-				if (debug) dumpInstruction(pc, "POP", 1, a);
 
                 store(pop(), a);
 
@@ -189,8 +221,6 @@ void run()
 				b = mem[pc++];
 				c = mem[pc++];
 
-				if (debug) dumpInstruction(pc, "EQ", 3, a, b, c);
-
 				store(value(b) == value(c) ? 1 : 0, a);
 
 				break;
@@ -202,8 +232,6 @@ void run()
 				b = mem[pc++];
 				c = mem[pc++];
 
-				if (debug) dumpInstruction(pc, "GT", 3, a, b, c);
-
 				store(value(b) > value(c) ? 1 : 0, a);
 
                 break;
@@ -212,8 +240,6 @@ void run()
 			case 6: // jmp: 6 a
 			{
 				a = mem[pc++];
-
-				if (debug) dumpInstruction(pc, "JMP", 1, a);
 
 				if (a < memsize)
 				{
@@ -231,8 +257,6 @@ void run()
 			{
 				a = mem[pc++];
 				b = mem[pc++];
-
-                if (debug) dumpInstruction(pc, "JT", 2, a, b);
 
 				if (value(a))
 				{
@@ -253,8 +277,6 @@ void run()
 			{
 				a = mem[pc++];
 				b = mem[pc++];
-
-                if (debug) dumpInstruction(pc, "JF", 2, a, b);
 
 				if (value(a) == 0)
 				{
@@ -277,8 +299,6 @@ void run()
 				b = mem[pc++];
 				c = mem[pc++];
 
-                if (debug) dumpInstruction(pc, "ADD", 3, a, b, c);
-
 				store((unsigned int)value(b) + value(c), a);
 			
 				break;
@@ -289,8 +309,6 @@ void run()
 				a = mem[pc++];
 				b = mem[pc++];
 				c = mem[pc++];
-
-                if (debug) dumpInstruction(pc, "MULT", 3, a, b, c);
 
 				store((unsigned int)value(b) * value(c), a);
 
@@ -303,8 +321,6 @@ void run()
 				b = mem[pc++];
 				c = mem[pc++];
 
-                if (debug) dumpInstruction(pc, "MOD", 3, a, b, c);
-
 				store((unsigned int)value(b) % value(c), a);
 
                 break;
@@ -315,8 +331,6 @@ void run()
 				a = mem[pc++];
 				b = mem[pc++];
 				c = mem[pc++];
-
-                if (debug) dumpInstruction(pc, "AND", 3, a, b, c);
 
 				store(value(b) & value(c), a);
 
@@ -329,8 +343,6 @@ void run()
 				b = mem[pc++];
 				c = mem[pc++];
 
-                if (debug) dumpInstruction(pc, "OR", 3, a, b, c);
-
 				store(value(b) | value(c), a);
 
 				break;
@@ -340,9 +352,6 @@ void run()
 			{
 				a = mem[pc++];
 				b = mem[pc++];
-
-                if (debug) dumpInstruction(pc, "NOT", 2, a, b);
-
 
 				store(~value(b), a);
 
@@ -354,8 +363,6 @@ void run()
 				a = mem[pc++];
 				b = mem[pc++];
 
-                if (debug) dumpInstruction(pc, "RMEM", 2, a, b);
-
 				store(mem[value(b)], a);
 
 				break;
@@ -366,8 +373,6 @@ void run()
 				a = mem[pc++];
 				b = mem[pc++];
 
-                if (debug) dumpInstruction(pc, "WMEM", 2, a, b);
-
                 mem[value(a)] = value(b);
 
 				break;
@@ -377,8 +382,6 @@ void run()
 			{
 				a = mem[pc++];
 
-				if (debug) dumpInstruction(pc, "CALL", 1, a);
-
                 push(pc);
                 pc = value(a);
 
@@ -387,8 +390,6 @@ void run()
 
             case 18: // ret: 18
             {
-				if (debug) dumpInstruction(pc, "RET", 0);
-
                 pc = pop();
 
                 break;
@@ -398,8 +399,6 @@ void run()
 			{
 				a = mem[pc++];
 
-				if (debug) dumpInstruction(pc, "OUT", 1, a);
-
 				fprintf(stdout, "%c", value(a));
 
 				break;
@@ -407,8 +406,6 @@ void run()
 
 			case 21: // noop: 21
 			{
-				if (debug) dumpInstruction(pc, "NOOP", 0);
-
 				break;
 			}
 
