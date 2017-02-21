@@ -20,7 +20,7 @@ static const unsigned int stacksize = 1 << 15;
 word reg[8];
 
 word mem[memsize];
-word pc;
+word pc, pci;
 
 word stack[stacksize];
 word sp = stacksize;
@@ -28,6 +28,7 @@ word sp = stacksize;
 word a, b, c;
 
 bool debug = false;
+bool unasm = false;
 
 
 void setup()
@@ -40,49 +41,52 @@ void setup()
     a = b = c = 0;
 }
 
-word value(word v)
+word value(word val)
 {
-	if (v < 32768)
+	if (val < 32768)
 	{
-		return v;
+		return val;
 	}
-	else if (v - 32768 < 8)
+	else if (val - 32768 < 8)
 	{
-		return reg[v & 7];
+		return reg[val & 7];
 	}
 
-	fprintf(stderr, ">>ERR! unallowed value! [pc:%04d = %d]\n", pc, v);
+	fprintf(stderr, ">>ERR! unallowed value! %d [pc:%04d]\n", val, pci);
 
 	return 0;
 }
 
-void store(word v, word dest)
+void set(word dest, word val)
 {
-    if (dest < memsize)
+    if (dest >= memsize && dest < memsize + 8)
+    {
+        reg[dest - memsize] = val & 32767;
+    }
+    else
 	{
-        v &= 32767;
-
-		mem[dest + 0] = v & 0x00FF;
-		mem[dest + 1] = v & 0xFF00;
-	}
-	else if (dest < 32776)
-	{
-		reg[dest - memsize] = v & 32767;
-	}
-	else
-	{
-		fprintf(stderr, ">>ERR! unallowed destination! [pc:%04d = %d]\n", pc, v);
+		fprintf(stderr, ">>ERR! invalid destination register for SET! %d [pc:%04d]\n", dest, pci);
 	}
 }
 
-void push(word v)
+void pushStack(word v)
 {
-    stack[--sp] = v;
+    if (sp > 0)
+    {
+        stack[--sp] = v;
+    }
+    else
+    {
+        fprintf(stderr, ">>ERR! stack overflow! [pc:%04d]\n", pci);
+    }
 }
 
-word pop()
+word popStack()
 {
-    return stack[sp++];
+    if (sp <= stacksize)
+        return stack[sp++];
+
+    return -1;
 }
 
 unsigned int dump(const unsigned int addr)
@@ -119,15 +123,15 @@ unsigned int dump(const unsigned int addr)
     }
 
 	// memory
-	fprintf(stderr, "  %08d: %04X", addr, mem[addr]);
+	fprintf(stderr, "  %08d: %04X ", addr, mem[addr]);
 	for (unsigned int i = 0; i < count; ++i)
 	{
 		fprintf(stderr, " %04X", mem[addr + i + 1]);
 	}
 
 	// instruction
-    char pad[3 * 5] = "               ";
-    pad[(3 - count) * 5] = '\0';
+    char pad[3 * 5 + 1] = "                ";
+    pad[1 + (3 - count) * 5] = '\0';
 	fprintf(stderr, "%s\t%s", pad, inst);
 
 	// operands
@@ -167,6 +171,14 @@ void dumps(const unsigned int addr, unsigned int icount)
     }
 }
 
+void desasm(const unsigned int start, unsigned int end)
+{
+    for (unsigned int a = start; a < end; )
+    {
+        a += dump(a);
+    }
+}
+
 void run()
 {
 	bool active = true;
@@ -174,6 +186,13 @@ void run()
 	{
         if (debug) dump(pc);
 
+        // 1520 // 1755 // 2125
+        // if (pc == 1471)
+        // {
+        //     printf("*-- Breakpoint --------------------\n");
+        // }
+
+        pci = pc;
         word i = mem[pc++];
 
 		switch (i)
@@ -182,7 +201,7 @@ void run()
 			{
 				active = false;
 
-				fprintf(stderr, ">>HALT: Program ended. [pc:%04d = %d]\n", pc, mem[pc - 1]);
+				fprintf(stderr, ">>HALT: Program ended. [pc:%04d = %d]\n", pc - 1, mem[pc - 1]);
 
 				break;
 			}
@@ -192,7 +211,7 @@ void run()
 				a = mem[pc++];
 				b = mem[pc++];
 
-				store(b, a);
+				set(a, value(b));
 
 				break;
 			}
@@ -201,7 +220,7 @@ void run()
             {
 				a = mem[pc++];
 
-                push(value(a));
+                pushStack(value(a));
 
                 break;
             }
@@ -210,7 +229,14 @@ void run()
             {
 				a = mem[pc++];
 
-                store(pop(), a);
+				if (a < memsize)
+				{
+					mem[a] = popStack();
+				}
+				else if (a < memsize + 8)
+				{
+					reg[a - memsize] = popStack();
+				}
 
                 break;
             }
@@ -221,7 +247,7 @@ void run()
 				b = mem[pc++];
 				c = mem[pc++];
 
-				store(value(b) == value(c) ? 1 : 0, a);
+                set(a, value(b) == value(c) ? 1 : 0);
 
 				break;
 			}
@@ -232,7 +258,7 @@ void run()
 				b = mem[pc++];
 				c = mem[pc++];
 
-				store(value(b) > value(c) ? 1 : 0, a);
+				set(a, value(b) > value(c) ? 1 : 0);
 
                 break;
             }
@@ -247,7 +273,7 @@ void run()
 				}
 				else
 				{
-					fprintf(stderr, ">>ERR! invalid JMP address! [pc:%04d = %d]\n", pc, a);
+					fprintf(stderr, ">>ERR! invalid JMP address! %d [pc:%04d]\n", a, pci);
 				}
 
 				break;
@@ -266,7 +292,7 @@ void run()
 					}
 					else
 					{
-						fprintf(stderr, ">>ERR! invalid JT address! [pc:%04d = %d]\n", pc, b);
+						fprintf(stderr, ">>ERR! invalid JT address! %d [pc:%04d]\n", b, pci);
 					}
 				}
 
@@ -286,7 +312,7 @@ void run()
 					}
 					else
 					{
-						fprintf(stderr, ">>ERR! invalid JT address! [pc:%04d = %d]\n", pc, b);
+						fprintf(stderr, ">>ERR! invalid JT address! %d [pc:%04d]\n", b, pci);
 					}
 				}
 
@@ -299,7 +325,7 @@ void run()
 				b = mem[pc++];
 				c = mem[pc++];
 
-				store((unsigned int)value(b) + value(c), a);
+                set(a, (unsigned int)value(b) + value(c));
 			
 				break;
 			}
@@ -310,7 +336,7 @@ void run()
 				b = mem[pc++];
 				c = mem[pc++];
 
-				store((unsigned int)value(b) * value(c), a);
+				set(a, (unsigned int)value(b) * value(c));
 
                 break;
             }
@@ -321,7 +347,7 @@ void run()
 				b = mem[pc++];
 				c = mem[pc++];
 
-				store((unsigned int)value(b) % value(c), a);
+				set(a, (unsigned int)value(b) % value(c));
 
                 break;
             }
@@ -332,7 +358,7 @@ void run()
 				b = mem[pc++];
 				c = mem[pc++];
 
-				store(value(b) & value(c), a);
+				set(a, value(b) & value(c));
 
 				break;
 			}
@@ -343,7 +369,7 @@ void run()
 				b = mem[pc++];
 				c = mem[pc++];
 
-				store(value(b) | value(c), a);
+				set(a, value(b) | value(c));
 
 				break;
 			}
@@ -353,7 +379,7 @@ void run()
 				a = mem[pc++];
 				b = mem[pc++];
 
-				store(~value(b), a);
+				set(a, ~value(b));
 
 				break;
 			}
@@ -363,7 +389,7 @@ void run()
 				a = mem[pc++];
 				b = mem[pc++];
 
-				store(mem[value(b)], a);
+				set(a, mem[value(b)]);
 
 				break;
 			}
@@ -382,7 +408,7 @@ void run()
 			{
 				a = mem[pc++];
 
-                push(pc);
+                pushStack(pc);
                 pc = value(a);
 
                 break;
@@ -390,7 +416,7 @@ void run()
 
             case 18: // ret: 18
             {
-                pc = pop();
+                pc = popStack();
 
                 break;
             }
@@ -411,7 +437,7 @@ void run()
 
 			default:
 			{
-				fprintf(stderr, ">>ERR! unrecognized instruction! [pc:%04d = %d]\n", pc - 1, mem[pc - 1]);
+				fprintf(stderr, ">>ERR! unrecognized instruction! %d [pc:%04d]\n", i, pci);
 				return;
 			}
 		}
@@ -420,7 +446,7 @@ void run()
 	printf("\n");
 }
 
-int readFile(const char *filename)
+unsigned int readFile(const char *filename)
 {
 	FILE *f = NULL;
     if (!(f = fopen(filename, "r")))
@@ -429,7 +455,7 @@ int readFile(const char *filename)
         return -1;
     }
 
-	int sizeread = (int)fread(mem, 1, 32768, f);
+	int sizeread = (unsigned int)fread(mem, 1, 32768, f);
 
     fclose(f);
 
@@ -450,6 +476,12 @@ int main(int argc, const char *argv[])
         if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--debug") == 0)
         {
         	debug = true;
+        }
+
+        // unasm
+        else if (strcmp(argv[i], "-u") == 0 || strcmp(argv[i], "--unasm") == 0)
+        {
+            unasm = true;
         }
 
         // help
@@ -477,9 +509,17 @@ int main(int argc, const char *argv[])
     {
         setup();
 
-		if (readFile(filename) > 0)
+        unsigned int size = readFile(filename);
+		if (size > 0)
 		{
-			run();
+            if (debug && unasm)
+            {
+                desasm(0, size);
+            }
+            else
+            {
+                run();
+            }
 
 			return 0;
 		}
@@ -493,11 +533,13 @@ usage:
     fprintf(stderr, "   -------\n\n");
 
     fprintf(stderr, "   usage:\n");
-    fprintf(stderr, "     %s path [-h/--help] | [-d/--debug]\n\n", argv[0]);
+    fprintf(stderr, "     %s path [-h/--help] | [-d/--debug|-u/--unasm]\n\n", argv[0]);
 
     fprintf(stderr, "   parameters:\n");
-    fprintf(stderr, "     -h, --help     - display this\n");
-    fprintf(stderr, "     -d, --debug    - enable debug\n\n");
+    fprintf(stderr, "     -h, --help     - display this\n\n");
+
+    fprintf(stderr, "     -d, --debug    - enable debug\n");
+    fprintf(stderr, "     -u, --unasm    - enable debug\n\n");
 
     fprintf(stderr, "   example:\n");
     fprintf(stderr, "     %s example.bin\n", argv[0]);
