@@ -9,25 +9,29 @@
 #include <memory.h>
 #include <stdio.h>
 
+#include <signal.h>
+
 #include "types.h"
 #include "instruction.h"
 
 #include "processor.h"
 
 
-const unsigned int memsize = 1 << 15;
-const unsigned int memmask = memsize -1;
+const unsigned int kMemSize = 1 << 15;
+const unsigned int kMemMask = kMemSize - 1;
 
-const unsigned int stacksize = 1 << 15;
+const unsigned int kStackSize = 1 << 15;
+
+const unsigned int kRegisterCount = 8;
 
 
-word mem[memsize];
+word mem[kMemSize];
 int pc, pci;
 
-word stack[stacksize];
-int sp = stacksize;
+word stack[kStackSize];
+int sp = kStackSize;
 
-word reg[8];
+word reg[kRegisterCount];
 word a, b, c;
 
 bool active = false;
@@ -35,16 +39,65 @@ bool debug = false;
 
 
 
-void reset()
+// MARK: - Helpers
+
+const char *b2a(unsigned short val)
 {
-    memset(mem, 0, memsize);
+    static char binaryString[] = "0b................";
+ 
+    unsigned int mask = 0x8000;
+    for (unsigned int i = 0; i < 16; ++i)
+    {
+        binaryString[i + 2] = val & mask ? '1' : '0';
+        mask >>= 1;
+    }
     
-    memset(reg, 0, 8 * sizeof(word));
-    pc = 0;
-    
-    a = b = c = 0;
+    return binaryString;
 }
 
+void dumpRegisters(unsigned short rbitfield)
+{
+    if (rbitfield == 0)
+    {
+        rbitfield = 255;
+    }
+    
+    fprintf(stderr, "\n  REGISTERS\n -----------------------------------------\n");
+    
+    short mask = 1;
+    
+    for (unsigned int i = 0; i < 8; ++i)
+    {
+        if (rbitfield & mask)
+        {
+            fprintf(stderr, "  R%i: 0x%04X %s %d\n", i, reg[i], b2a(reg[i]), reg[i]);
+        }
+        mask <<= 1;
+    }
+    
+    fprintf(stderr, " -----------------------------------------\n");
+}
+
+void dumpInstructions(const unsigned int addr, unsigned int icount)
+{
+    unsigned int a = addr;
+    
+    while (icount--)
+    {
+        a += dumpInstructionAtAddress(a);
+    }
+}
+
+void dumpAllInstructions(const unsigned int start, unsigned int end)
+{
+    for (unsigned int a = start; a < end; )
+    {
+        a += dumpInstructionAtAddress(a);
+    }
+}
+
+
+// MARK: - Value
 
 word value(word val)
 {
@@ -52,7 +105,7 @@ word value(word val)
     {
         return val;
     }
-    else if (val < 32768 + 8)
+    else if (val < 32768 + kRegisterCount)
     {
         return reg[val & 7];
     }
@@ -65,9 +118,9 @@ word value(word val)
 
 void set(word dest, word val)
 {
-    if (a >= memsize || a < memsize + 8)
+    if (a >= kMemSize || a < kMemSize + kRegisterCount)
     {
-        reg[a - memsize] = b;
+        reg[a - kMemSize] = b;
     }
     else
     {
@@ -75,6 +128,9 @@ void set(word dest, word val)
         active = false;
     }
 }
+
+
+// MARK: - Stack
 
 void pushStack(word v)
 {
@@ -91,7 +147,7 @@ void pushStack(word v)
 
 word popStack()
 {
-    if (sp <= stacksize)
+    if (sp <= kStackSize)
     {
         return stack[sp++];
     }
@@ -102,9 +158,12 @@ word popStack()
     return -1;
 }
 
-void runInstruction(unsigned int address)
+
+// MARK: - Execution
+
+unsigned int runInstructionAtAddress(unsigned int address)
 {
-    word i = mem[address];
+    word i = mem[address++];
     
     switch (i)
     {
@@ -119,8 +178,8 @@ void runInstruction(unsigned int address)
             
         case 1: // set: 1 a b
         {
-            a = mem[pc++];
-            b = mem[pc++];
+            a = mem[address++];
+            b = mem[address++];
             
             set(a, value(b));
             
@@ -129,7 +188,7 @@ void runInstruction(unsigned int address)
             
         case 2: // push: 2 a
         {
-            a = mem[pc++];
+            a = mem[address++];
             
             pushStack(value(a));
             
@@ -138,15 +197,15 @@ void runInstruction(unsigned int address)
             
         case 3: // pop: 3 a
         {
-            a = mem[pc++];
+            a = mem[address++];
             
-            if (a < memsize)
+            if (a < kMemSize)
             {
                 mem[a] = popStack();
             }
-            else if (a < memsize + 8)
+            else if (a < kMemSize + kRegisterCount)
             {
-                reg[a - memsize] = popStack();
+                reg[a - kMemSize] = popStack();
             }
             
             break;
@@ -154,9 +213,9 @@ void runInstruction(unsigned int address)
             
         case 4: // eq: 4 a b c
         {
-            a = mem[pc++];
-            b = mem[pc++];
-            c = mem[pc++];
+            a = mem[address++];
+            b = mem[address++];
+            c = mem[address++];
             
             set(a, value(b) == value(c) ? 1 : 0);
             
@@ -165,9 +224,9 @@ void runInstruction(unsigned int address)
             
         case 5: // gt: 5 a b c
         {
-            a = mem[pc++];
-            b = mem[pc++];
-            c = mem[pc++];
+            a = mem[address++];
+            b = mem[address++];
+            c = mem[address++];
             
             set(a, value(b) > value(c) ? 1 : 0);
             
@@ -176,11 +235,12 @@ void runInstruction(unsigned int address)
             
         case 6: // jmp: 6 a
         {
-            a = mem[pc++];
+            a = mem[address++];
             
-            if (a < memsize)
+            if (a < kMemSize)
             {
                 pc = a;
+                return 0;
             }
             else
             {
@@ -192,14 +252,15 @@ void runInstruction(unsigned int address)
             
         case 7: // jt: 7 a b
         {
-            a = mem[pc++];
-            b = mem[pc++];
+            a = mem[address++];
+            b = mem[address++];
             
             if (value(a))
             {
-                if (b < memsize)
+                if (b < kMemSize)
                 {
                     pc = b;
+                    return 0;
                 }
                 else
                 {
@@ -212,14 +273,15 @@ void runInstruction(unsigned int address)
             
         case 8: // jf: 8 a b
         {
-            a = mem[pc++];
-            b = mem[pc++];
+            a = mem[address++];
+            b = mem[address++];
             
             if (value(a) == 0)
             {
-                if (b < memsize)
+                if (b < kMemSize)
                 {
                     pc = b;
+                    return 0;
                 }
                 else
                 {
@@ -232,9 +294,9 @@ void runInstruction(unsigned int address)
             
         case 9: // add: 9 a b c
         {
-            a = mem[pc++];
-            b = mem[pc++];
-            c = mem[pc++];
+            a = mem[address++];
+            b = mem[address++];
+            c = mem[address++];
             
             set(a, (unsigned int)value(b) + value(c));
             
@@ -243,9 +305,9 @@ void runInstruction(unsigned int address)
             
         case 10: // mult: 10 a b c
         {
-            a = mem[pc++];
-            b = mem[pc++];
-            c = mem[pc++];
+            a = mem[address++];
+            b = mem[address++];
+            c = mem[address++];
             
             set(a, (unsigned int)value(b) * value(c));
             
@@ -254,9 +316,9 @@ void runInstruction(unsigned int address)
             
         case 11: // mod: 11 a b c
         {
-            a = mem[pc++];
-            b = mem[pc++];
-            c = mem[pc++];
+            a = mem[address++];
+            b = mem[address++];
+            c = mem[address++];
             
             set(a, (unsigned int)value(b) % value(c));
             
@@ -265,9 +327,9 @@ void runInstruction(unsigned int address)
             
         case 12: // and: 12 a b c
         {
-            a = mem[pc++];
-            b = mem[pc++];
-            c = mem[pc++];
+            a = mem[address++];
+            b = mem[address++];
+            c = mem[address++];
             
             set(a, value(b) & value(c));
             
@@ -276,9 +338,9 @@ void runInstruction(unsigned int address)
             
         case 13: // or: 12 a b c
         {
-            a = mem[pc++];
-            b = mem[pc++];
-            c = mem[pc++];
+            a = mem[address++];
+            b = mem[address++];
+            c = mem[address++];
             
             set(a, value(b) | value(c));
             
@@ -287,8 +349,8 @@ void runInstruction(unsigned int address)
             
         case 14: // not: 14 a b
         {
-            a = mem[pc++];
-            b = mem[pc++];
+            a = mem[address++];
+            b = mem[address++];
             
             set(a, ~value(b));
             
@@ -297,8 +359,8 @@ void runInstruction(unsigned int address)
             
         case 15: // rmem: 15 a b
         {
-            a = mem[pc++];
-            b = mem[pc++];
+            a = mem[address++];
+            b = mem[address++];
             
             set(a, mem[value(b)]);
             
@@ -307,8 +369,8 @@ void runInstruction(unsigned int address)
             
         case 16: // wmem: 16 a b
         {
-            a = mem[pc++];
-            b = mem[pc++];
+            a = mem[address++];
+            b = mem[address++];
             
             mem[value(a)] = value(b);
             
@@ -317,54 +379,53 @@ void runInstruction(unsigned int address)
             
         case 17: // call: 17 a
         {
-            a = mem[pc++];
+            a = mem[address++];
             
-            pushStack(pc);
+            pushStack(address);
             pc = value(a);
-            
-            break;
+
+            return 0;
         }
             
         case 18: // ret: 18
         {
             pc = popStack();
             
-            break;
+            return 0;
         }
             
         case 19: // out: 19 a
         {
-            a = mem[pc++];
+            unsigned int ad = address - 1;
             
-            char str[8];
-            str[0] = str[1];
-            str[1] = str[2];
-            str[2] = str[3];
-            str[3] = str[4];
-            str[4] = str[5];
-            str[5] = str[6];
-            str[6] = a;
-            str[7] = 0;
-            
-            if (a > 9 && a < 128)
+            char c;
+            while (mem[ad] == 19 && (c = mem[ad + 1]))
             {
-                fprintf(stdout, "%c", a);
+                fprintf(stderr, "%c", c);
+                
+                ad += 2;
+                
+                if (c == 10)
+                    break;
             }
             
-            break;
+            return ad - address + 1;
         }
             
         case 21: // noop: 21
         {
-            break;
+            return 1;
         }
             
         default:
         {
             fprintf(stderr, ">>ERR! unrecognized instruction! %d [pc:%04d]\n", i, pci);
-            return;
+
+            return 1;
         }
     }
+    
+    return instructionLength(i);
 }
 
 void run()
@@ -372,23 +433,36 @@ void run()
     active = true;
     while (active)
     {
-        if (debug) dumpInstructionAt(pc);
+        if (debug) dumpInstructionAtAddress(pc);
         
-        int breakpoints[] = {590, };//1471, 1520, 1755, 2125};
+        int breakpoints[] = {590};//1471, 1520, 1755, 2125};
         for (unsigned int i = 0; i < sizeof(breakpoints) / sizeof(breakpoints[0]); ++i)
         {
             if (pc == breakpoints[i])
             {
                 printf("*-- Breakpoint --------------------\n");
-                
+
+//                raise(SIGINT);
+//                active = false;
+
                 debug = true;
-                //                active = false;
             }
         }
         
         pci = pc;
-        runInstruction(pc++);
+        unsigned int sz = runInstructionAtAddress(pc);
+        pc += sz;
     }
     
     printf("\n");
+}
+
+void reset()
+{
+    memset(mem, 0, kMemSize);
+    
+    memset(reg, 0, kRegisterCount * sizeof(word));
+    pc = 0;
+    
+    a = b = c = 0;
 }

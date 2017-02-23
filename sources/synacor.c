@@ -20,57 +20,6 @@
 bool unasm = false;
 
 
-void regs(unsigned short rbitfield)
-{
-    if (rbitfield == 0)
-    {
-        rbitfield = 255;
-    }
-        
-    fprintf(stderr, " -- REGISTERS --\n");
-
-    short mask = 1;
-    short maxline = 4;
-    short cline = maxline;
-    
-    for (unsigned int i = 0; i < 8; ++i)
-    {
-        if (rbitfield & mask)
-        {
-            fprintf(stderr, "  R%i: %04X ", i, reg[i]);
-            mask <<= 1;
-            
-            if (--cline < 0)
-            {
-                cline = maxline;
-                fprintf(stderr, "\n");
-            }
-        }
-    }
-
-    fprintf(stderr, "\n ---------------\n");
-}
-
-
-void dumps(const unsigned int addr, unsigned int icount)
-{
-    unsigned int a = addr;
-    
-    while (icount--)
-    {
-        a += dumpInstructionAt(a);
-    }
-}
-
-void desasm(const unsigned int start, unsigned int end)
-{
-    for (unsigned int a = start; a < end; )
-    {
-        a += dumpInstructionAt(a);
-    }
-}
-
-
 unsigned int readFile(const char *filename)
 {
     FILE *f = NULL;
@@ -92,7 +41,7 @@ int main(int argc, const char *argv[])
     char filename[PATH_MAX] = "\0";
     strcpy(filename, "/Users/thomascarton/Work/Tom/Synacor/challenge.bin");
     debug = true;
-    unasm = true;
+//    unasm = true;
 //    if (argc < 2)
 //        goto usage;
     
@@ -143,7 +92,7 @@ int main(int argc, const char *argv[])
             {
                 scanForLabels(0, size / 2);
                 
-                desasm(0, size / 2);
+                dumpAllInstructions(0, size / 2);
             }
             else
             {

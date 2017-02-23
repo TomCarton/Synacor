@@ -11,13 +11,16 @@
 #include "types.h"
 
 
-typedef struct { word address; char name[10]; } Label;
+#define kLabelMaxSize 20
+
+
+typedef struct { word address; char name[kLabelMaxSize + 1]; } Label;
 
 extern unsigned int labelCount;
 extern Label labels[];
 
 
-void listLabels();
+void dumpLabels();
 Label *labelAtAddress(const unsigned int address);
 
 void scanForLabels(const unsigned int addr, const unsigned int end);

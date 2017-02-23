@@ -10,6 +10,6 @@
 
 unsigned int instructionLength(word instruction);
 
-unsigned int dumpInstructionAt(const unsigned int addr);
+unsigned int dumpInstructionAtAddress(const unsigned int addr);
 
 #endif /* instruction_h */

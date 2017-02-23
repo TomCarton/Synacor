@@ -11,13 +11,15 @@
 
 #include "types.h"
 #include "label.h"
+#include "processor.h"
 
 #include "instruction.h"
 
 
 extern word mem[];
-extern const unsigned int memsize;
-extern const unsigned int stacksize;
+extern const unsigned int kMemSize;
+
+static const unsigned int kMaxOperandCount = 3;
 
 
 unsigned int instructionLength(word instruction)
@@ -53,58 +55,66 @@ unsigned int instructionLength(word instruction)
 
 void addPadding(unsigned int count)
 {
+    count = count > kLabelMaxSize ? kLabelMaxSize : count;
+    
     // pad
-    char padding[20 + 1] = "                    ";
-
-    char pad[20 + 1];
+    char padding[kLabelMaxSize + 1];
+    
+    for (unsigned int i = 0; i < kLabelMaxSize; ++i)
+    {
+        padding[i] = ' ';
+    }
+    padding[kLabelMaxSize] = '\0';
+    
+    char pad[kLabelMaxSize + 1];
     strcpy(pad, padding);
     pad[count] = '\0';
     
     fprintf(stderr, "%s", pad);
 }
 
-unsigned int dumpInstructionAt(const unsigned int addr)
+unsigned int dumpInstructionAtAddress(const unsigned int addr)
 {
     word i = mem[addr];
     
-    char inst[] = "???\0\0\0\0\0";
-    unsigned int count = 0;
+    char inst[] = "???\0\0";
+    unsigned int operandCount = 0;
     
     switch (i)
     {
-        case 0: strcpy(inst, "HALT"); count = 0; break;     // halt: 0
-        case 1: strcpy(inst, "SET"); count = 2; break;      // set:  1 a b
-        case 2: strcpy(inst, "PUSH"); count = 1; break;     // push: 2 a
-        case 3: strcpy(inst, "POP"); count = 1; break;      // pop: 3 a
-        case 4: strcpy(inst, "EQ"); count = 3; break;       // eq: 4 a b c
-        case 5: strcpy(inst, "GT"); count = 3; break;       // gt: 5 a b c
-        case 6: strcpy(inst, "JMP"); count = 1; break;      // jmp: 6 a
-        case 7: strcpy(inst, "JT"); count = 2; break;       // jt: 7 a b
-        case 8: strcpy(inst, "JF"); count = 2; break;       // jf: 8 a b
-        case 9: strcpy(inst, "ADD"); count = 3; break;      // add: 9 a b c
-        case 10: strcpy(inst, "MULT"); count = 3; break;    // mult: 10 a b c
-        case 11: strcpy(inst, "MOD"); count = 3; break;     // mod: 11 a b c
-        case 12: strcpy(inst, "AND"); count = 3; break;     // and: 12 a b c
-        case 13: strcpy(inst, "OR"); count = 3; break;      // or: 13 a b c
-        case 14: strcpy(inst, "NOT"); count = 2; break;     // not: 14 a b
-        case 15: strcpy(inst, "RMEM"); count = 2; break;    // rmem: 15 a b
-        case 16: strcpy(inst, "WMEM"); count = 2; break;    // wmem: 16 a b
-        case 17: strcpy(inst, "CALL"); count = 1; break;    // call: 17 a
-        case 18: strcpy(inst, "RET"); count = 0; break;     // ret: 18
-        case 19: strcpy(inst, "OUT"); count = 1; break;     // out: 19 a
-        case 20: strcpy(inst, "IN"); count = 1; break;      // in: 20 a
-        case 21: strcpy(inst, "NOOP"); count = 0; break;    // noop: 21
+        case 0: strcpy(inst, "HALT"); operandCount = 0; break;     // halt: 0
+        case 1: strcpy(inst, "SET"); operandCount = 2; break;      // set:  1 a b
+        case 2: strcpy(inst, "PUSH"); operandCount = 1; break;     // push: 2 a
+        case 3: strcpy(inst, "POP"); operandCount = 1; break;      // pop: 3 a
+        case 4: strcpy(inst, "EQ"); operandCount = 3; break;       // eq: 4 a b c
+        case 5: strcpy(inst, "GT"); operandCount = 3; break;       // gt: 5 a b c
+        case 6: strcpy(inst, "JMP"); operandCount = 1; break;      // jmp: 6 a
+        case 7: strcpy(inst, "JT"); operandCount = 2; break;       // jt: 7 a b
+        case 8: strcpy(inst, "JF"); operandCount = 2; break;       // jf: 8 a b
+        case 9: strcpy(inst, "ADD"); operandCount = 3; break;      // add: 9 a b c
+        case 10: strcpy(inst, "MULT"); operandCount = 3; break;    // mult: 10 a b c
+        case 11: strcpy(inst, "MOD"); operandCount = 3; break;     // mod: 11 a b c
+        case 12: strcpy(inst, "AND"); operandCount = 3; break;     // and: 12 a b c
+        case 13: strcpy(inst, "OR"); operandCount = 3; break;      // or: 13 a b c
+        case 14: strcpy(inst, "NOT"); operandCount = 2; break;     // not: 14 a b
+        case 15: strcpy(inst, "RMEM"); operandCount = 2; break;    // rmem: 15 a b
+        case 16: strcpy(inst, "WMEM"); operandCount = 2; break;    // wmem: 16 a b
+        case 17: strcpy(inst, "CALL"); operandCount = 1; break;    // call: 17 a
+        case 18: strcpy(inst, "RET"); operandCount = 0; break;     // ret: 18
+        case 19: strcpy(inst, "OUT"); operandCount = 1; break;     // out: 19 a
+        case 20: strcpy(inst, "IN"); operandCount = 1; break;      // in: 20 a
+        case 21: strcpy(inst, "NOOP"); operandCount = 0; break;    // noop: 21
     }
     
     // memory
     fprintf(stderr, "  0x%06X: %04X ", addr, mem[addr]);
-    for (unsigned int i = 0; i < count; ++i)
+    for (unsigned int i = 0; i < operandCount; ++i)
     {
         fprintf(stderr, " %04X", mem[addr + i + 1]);
     }
     
     // pad
-    addPadding(2 + (3 - count) * 5);
+    addPadding(2 + (kMaxOperandCount - operandCount) * 5);
     
     // label
     Label *label = NULL;
@@ -119,11 +129,11 @@ unsigned int dumpInstructionAt(const unsigned int addr)
     if (label)
     {
         fprintf(stderr, "%s:", label->name);
-        addPadding(14 - (unsigned int)strlen(label->name));
+        addPadding(kLabelMaxSize - (unsigned int)strlen(label->name) - 1);
     }
     else
     {
-        addPadding(15);
+        addPadding(kLabelMaxSize);
     }
     
     // instruction
@@ -146,7 +156,7 @@ unsigned int dumpInstructionAt(const unsigned int addr)
             fprintf(stderr, "%c", c);
             
             ad += 2;
-            count += 2;
+            operandCount += 2;
         }
         
         fprintf(stderr, "' (%d)", c);
@@ -154,7 +164,7 @@ unsigned int dumpInstructionAt(const unsigned int addr)
     else
     {
         // label
-        unsigned int lind = count;
+        unsigned int lind = operandCount;
         if (mem[addr] == 6 || mem[addr] == 17)
         {
             lind = 0;
@@ -165,27 +175,34 @@ unsigned int dumpInstructionAt(const unsigned int addr)
         }
         
         // operands
-        for (unsigned int i = 0; i < count; ++i)
+        for (unsigned int i = 0; i < operandCount; ++i)
         {
             word o = mem[addr + 1 + i];
 
             Label *lbl = NULL;
-            if (i == lind && (lbl = labelAtAddress(o)))
-            {
-                fprintf(stderr, " %s (0x%06X)", lbl->name, lbl->address);
-            }
-            else if (o < memsize)
-            {
-                fprintf(stderr, " %d", o);
-            }
-            else if (o < 32776)
+            if (o >= kMemSize && o < kMemSize + kRegisterCount)
             {
                 fprintf(stderr, " r%d", o & 7);
+            }
+            else if (o < kMemSize)
+            {
+                if (i == lind && (lbl = labelAtAddress(o)))
+                {
+                    fprintf(stderr, " %s (0x%06X)", lbl->name, lbl->address);
+                }
+                else
+                {
+                    fprintf(stderr, " %d", o);
+                }
+            }
+            else
+            {
+                fprintf(stderr, " ??");
             }
         }
     }
     
     fprintf(stderr, "\n");
     
-    return count + 1;
+    return operandCount + 1;
 }
