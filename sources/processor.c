@@ -26,17 +26,18 @@ const unsigned int kRegisterCount = 8;
 
 
 word mem[kMemSize];
-int pc, pci;
+word reg[kRegisterCount];
 
 word stack[kStackSize];
 int sp = kStackSize;
 
-word reg[kRegisterCount];
-word a, b, c;
+int pc;
 
 bool active = false;
 bool debug = false;
 
+
+byte breakpoint[kMemSize / 2];
 
 
 // MARK: - Helpers
@@ -70,7 +71,7 @@ void dumpRegisters(unsigned short rbitfield)
     {
         if (rbitfield & mask)
         {
-            fprintf(stderr, "  R%i: 0x%04X %s %d\n", i, reg[i], b2a(reg[i]), reg[i]);
+            fprintf(stderr, "  R%i: 0x%04X %s %d '%c'\n", i, reg[i], b2a(reg[i]), reg[i], reg[i]);
         }
         mask <<= 1;
     }
@@ -110,21 +111,21 @@ word value(word val)
         return reg[val & 7];
     }
     
-    fprintf(stderr, ">>ERR! unallowed value! %d [pc:%04d]\n", val, pci);
+    fprintf(stderr, ">>ERR! unallowed value! %d [pc:%04d]\n", val, pc);
     active = false;
     
     return 0;
 }
 
-void set(word dest, word val)
+void setRegister(unsigned int address, word value)
 {
-    if (a >= kMemSize || a < kMemSize + kRegisterCount)
+    if (address >= kMemSize && address < kMemSize + kRegisterCount)
     {
-        reg[a - kMemSize] = b;
+        reg[address - kMemSize] = value & kMemMask;
     }
     else
     {
-        fprintf(stderr, ">>ERR! illegal register! r%d [pc:%04d]\n", a, pci);
+        fprintf(stderr, ">>ERR! illegal register! r%d [pc:%04d]\n", address, pc);
         active = false;
     }
 }
@@ -140,7 +141,7 @@ void pushStack(word v)
     }
     else
     {
-        fprintf(stderr, ">>ERR! stack overflow! [pc:%04d]\n", pci);
+        fprintf(stderr, ">>ERR! stack overflow! [pc:%04d]\n", pc);
         active = false;
     }
 }
@@ -152,10 +153,28 @@ word popStack()
         return stack[sp++];
     }
     
-    fprintf(stderr, ">>ERR! stack overflow! [pc:%04d]\n", pci);
+    fprintf(stderr, ">>ERR! stack overflow! [pc:%04d]\n", pc);
     active = false;
     
     return -1;
+}
+
+
+// MARK: - Breakpoints
+
+void removeAllBreakpoints()
+{
+    memset(breakpoint, 0, kMemSize / 2);
+}
+
+void setBreakpoint(unsigned int address, byte active)
+{
+    breakpoint[address >> 1] = active;
+}
+
+bool isBreakpointAtAddress(unsigned int address)
+{
+    return breakpoint[address >> 1];
 }
 
 
@@ -178,17 +197,17 @@ unsigned int runInstructionAtAddress(unsigned int address)
             
         case 1: // set: 1 a b
         {
-            a = mem[address++];
-            b = mem[address++];
+            word a = mem[address++];
+            word b = mem[address++];
             
-            set(a, value(b));
+            setRegister(a, value(b));
             
             break;
         }
             
         case 2: // push: 2 a
         {
-            a = mem[address++];
+            word a = mem[address++];
             
             pushStack(value(a));
             
@@ -197,7 +216,7 @@ unsigned int runInstructionAtAddress(unsigned int address)
             
         case 3: // pop: 3 a
         {
-            a = mem[address++];
+            word a = mem[address++];
             
             if (a < kMemSize)
             {
@@ -213,29 +232,29 @@ unsigned int runInstructionAtAddress(unsigned int address)
             
         case 4: // eq: 4 a b c
         {
-            a = mem[address++];
-            b = mem[address++];
-            c = mem[address++];
+            word a = mem[address++];
+            word b = mem[address++];
+            word c = mem[address++];
             
-            set(a, value(b) == value(c) ? 1 : 0);
+            setRegister(a, value(b) == value(c) ? 1 : 0);
             
             break;
         }
             
         case 5: // gt: 5 a b c
         {
-            a = mem[address++];
-            b = mem[address++];
-            c = mem[address++];
+            word a = mem[address++];
+            word b = mem[address++];
+            word c = mem[address++];
             
-            set(a, value(b) > value(c) ? 1 : 0);
+            setRegister(a, value(b) > value(c) ? 1 : 0);
             
             break;
         }
             
         case 6: // jmp: 6 a
         {
-            a = mem[address++];
+            word a = mem[address++];
             
             if (a < kMemSize)
             {
@@ -244,7 +263,7 @@ unsigned int runInstructionAtAddress(unsigned int address)
             }
             else
             {
-                fprintf(stderr, ">>ERR! invalid JMP address! %d [pc:%04d]\n", a, pci);
+                fprintf(stderr, ">>ERR! invalid JMP address! %d [pc:%04d]\n", a, pc);
             }
             
             break;
@@ -252,8 +271,8 @@ unsigned int runInstructionAtAddress(unsigned int address)
             
         case 7: // jt: 7 a b
         {
-            a = mem[address++];
-            b = mem[address++];
+            word a = mem[address++];
+            word b = mem[address++];
             
             if (value(a))
             {
@@ -264,7 +283,7 @@ unsigned int runInstructionAtAddress(unsigned int address)
                 }
                 else
                 {
-                    fprintf(stderr, ">>ERR! invalid JT address! %d [pc:%04d]\n", b, pci);
+                    fprintf(stderr, ">>ERR! invalid JT address! %d [pc:%04d]\n", b, pc);
                 }
             }
             
@@ -273,8 +292,8 @@ unsigned int runInstructionAtAddress(unsigned int address)
             
         case 8: // jf: 8 a b
         {
-            a = mem[address++];
-            b = mem[address++];
+            word a = mem[address++];
+            word b = mem[address++];
             
             if (value(a) == 0)
             {
@@ -285,7 +304,7 @@ unsigned int runInstructionAtAddress(unsigned int address)
                 }
                 else
                 {
-                    fprintf(stderr, ">>ERR! invalid JT address! %d [pc:%04d]\n", b, pci);
+                    fprintf(stderr, ">>ERR! invalid JT address! %d [pc:%04d]\n", b, pc);
                 }
             }
             
@@ -294,92 +313,109 @@ unsigned int runInstructionAtAddress(unsigned int address)
             
         case 9: // add: 9 a b c
         {
-            a = mem[address++];
-            b = mem[address++];
-            c = mem[address++];
+            word a = mem[address++];
+            word b = mem[address++];
+            word c = mem[address++];
             
-            set(a, (unsigned int)value(b) + value(c));
+            setRegister(a, (unsigned int)value(b) + value(c));
             
             break;
         }
             
         case 10: // mult: 10 a b c
         {
-            a = mem[address++];
-            b = mem[address++];
-            c = mem[address++];
+            word a = mem[address++];
+            word b = mem[address++];
+            word c = mem[address++];
             
-            set(a, (unsigned int)value(b) * value(c));
+            setRegister(a, (unsigned int)value(b) * value(c));
             
             break;
         }
             
         case 11: // mod: 11 a b c
         {
-            a = mem[address++];
-            b = mem[address++];
-            c = mem[address++];
+            word a = mem[address++];
+            word b = mem[address++];
+            word c = mem[address++];
             
-            set(a, (unsigned int)value(b) % value(c));
+            setRegister(a, (unsigned int)value(b) % value(c));
             
             break;
         }
             
         case 12: // and: 12 a b c
         {
-            a = mem[address++];
-            b = mem[address++];
-            c = mem[address++];
+            word a = mem[address++];
+            word b = mem[address++];
+            word c = mem[address++];
             
-            set(a, value(b) & value(c));
+            setRegister(a, value(b) & value(c));
             
             break;
         }
             
         case 13: // or: 12 a b c
         {
-            a = mem[address++];
-            b = mem[address++];
-            c = mem[address++];
+            word a = mem[address++];
+            word b = mem[address++];
+            word c = mem[address++];
             
-            set(a, value(b) | value(c));
+            setRegister(a, value(b) | value(c));
             
             break;
         }
             
         case 14: // not: 14 a b
         {
-            a = mem[address++];
-            b = mem[address++];
+            word a = mem[address++];
+            word b = mem[address++];
             
-            set(a, ~value(b));
+            setRegister(a, ~value(b));
             
             break;
         }
             
+            
+            
+//        {
+//            word a = mem_arg(&PTR);
+//            word b = mem_arg(&PTR);
+//            
+//            mem_write(a, mem_read(mem_resolve(b)));
+//        }
+//            
+//            void wmem_state(void)
+//        {
+//            word a = mem_arg(&PTR);
+//            word b = mem_arg(&PTR);
+//            
+//            mem_write(mem_resolve(a), mem_resolve(b));
+//        }
+            
         case 15: // rmem: 15 a b
         {
-            a = mem[address++];
-            b = mem[address++];
+            word a = mem[address++];
+            word b = mem[address++];
             
-            set(a, mem[value(b)]);
+            setRegister(a, mem[value(b)]);
             
             break;
         }
             
         case 16: // wmem: 16 a b
         {
-            a = mem[address++];
-            b = mem[address++];
+            word a = mem[address++];
+            word b = mem[address++];
             
-            mem[value(a)] = value(b);
+            mem[value(a)] = value(b) & kMemMask;
             
             break;
         }
             
         case 17: // call: 17 a
         {
-            a = mem[address++];
+            word a = mem[address++];
             
             pushStack(address);
             pc = value(a);
@@ -399,17 +435,20 @@ unsigned int runInstructionAtAddress(unsigned int address)
             unsigned int ad = address - 1;
             
             char c;
-            while (mem[ad] == 19 && (c = mem[ad + 1]))
+            while (mem[ad] == 19 && (c = value(mem[ad + 1])))
             {
-                fprintf(stderr, "%c", c);
+                if (c > 8 && c < 127)
+                    fprintf(stderr, "%c", c);
                 
                 ad += 2;
                 
                 if (c == 10)
                     break;
             }
-            
-            return ad - address + 1;
+
+            int d = ad - address + 1;
+            if (d < 2) d = 2;
+            return d;
         }
             
         case 21: // noop: 21
@@ -419,13 +458,25 @@ unsigned int runInstructionAtAddress(unsigned int address)
             
         default:
         {
-            fprintf(stderr, ">>ERR! unrecognized instruction! %d [pc:%04d]\n", i, pci);
+            fprintf(stderr, ">>ERR! unrecognized instruction! %d [pc:%04d]\n", i, pc);
 
             return 1;
         }
     }
     
     return instructionLength(i);
+}
+
+void experimente()
+{
+    reg[0] = 26299;
+    pc = 15618;
+    active = true;
+    while (active)
+    {
+        unsigned int sz = runInstructionAtAddress(pc);
+        pc += sz;
+    }
 }
 
 void run()
@@ -435,21 +486,17 @@ void run()
     {
         if (debug) dumpInstructionAtAddress(pc);
         
-        int breakpoints[] = {590};//1471, 1520, 1755, 2125};
-        for (unsigned int i = 0; i < sizeof(breakpoints) / sizeof(breakpoints[0]); ++i)
+        if (isBreakpointAtAddress(pc))
         {
-            if (pc == breakpoints[i])
-            {
-                printf("*-- Breakpoint --------------------\n");
+            printf("*-- Breakpoint --------------------\n");
+            dumpInstructionAtAddress(pc);
+            printf("*-- Breakpoint --------------------\n");
 
-//                raise(SIGINT);
-//                active = false;
-
-                debug = true;
-            }
+//            raise(SIGINT);
+//            active = false;
+            debug = true;
         }
         
-        pci = pc;
         unsigned int sz = runInstructionAtAddress(pc);
         pc += sz;
     }
@@ -463,6 +510,6 @@ void reset()
     
     memset(reg, 0, kRegisterCount * sizeof(word));
     pc = 0;
-    
-    a = b = c = 0;
+        
+    memset(breakpoint, 0, kMemSize / 2);
 }

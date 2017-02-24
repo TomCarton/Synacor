@@ -21,8 +21,8 @@
 extern word mem[];
 
 
-unsigned int labelCount = 164;
-Label labels[164] =
+unsigned int labelCount = 166;
+Label labels[] =
 {
     {0x0000, "Start"},
     
@@ -39,8 +39,11 @@ Label labels[164] =
     {0x0234, "TestEqOp"},
     {0x024e, "TestStack"},
     {0x02ac, "TestNot"},
+    {0x02c4, "BackCallOp"},
+    {0x02db, "BackCallOp2"},
+    {0x034b, "TestMemSlot"},
     {0x034d, "TestMem"},
-    {0x03ad, "LBL_31"},
+    {0x03ad, "ErrWmem"},
     {0x03ff, "LBL_32"},
     {0x03e8, "LBL_33"},
     {0x0432, "ErrNoJtJf"},
@@ -58,16 +61,19 @@ Label labels[164] =
     {0x0565, "ErrHitchhiking"},
     {0x0586, "ErrMultOp"},
     {0x059d, "ErrModOp"},
+    
+    {0x05f8, "OutputR0"},
+    {0x084d, "Unhash"},
+
     {0x06bb, "LBL_30"},
     {0x05ee, "LBL_34"},
     {0x05b2, "LBL_35"},
     {0x0aae, "LBL_36"},
-    {0x02c4, "BackCallOp"},
-    {0x02db, "BackCallOp2"},
     {0x05e3, "LBL_39"},
     {0x8005, "LBL_40"},
     {0x05c8, "LBL_41"},
-    {0x084d, "LBL_42"},
+    
+
     {0x061b, "LBL_43"},
     {0x061e, "LBL_44"},
     {0x0607, "LBL_45"},

@@ -140,7 +140,7 @@ unsigned int dumpInstructionAtAddress(const unsigned int addr)
     fprintf(stderr, "%s", inst);
     
     // output string
-    if (mem[addr] == 19)
+    if (mem[addr] == 19 && mem[addr + 1] < kMemSize)
     {
         unsigned int ad = addr;
         
@@ -165,7 +165,7 @@ unsigned int dumpInstructionAtAddress(const unsigned int addr)
     {
         // label
         unsigned int lind = operandCount;
-        if (mem[addr] == 6 || mem[addr] == 17)
+        if (mem[addr] == 6 || mem[addr] == 17 || mem[addr] == 19)
         {
             lind = 0;
         }
@@ -188,11 +188,11 @@ unsigned int dumpInstructionAtAddress(const unsigned int addr)
             {
                 if (i == lind && (lbl = labelAtAddress(o)))
                 {
-                    fprintf(stderr, " %s (0x%06X)", lbl->name, lbl->address);
+                    fprintf(stderr, " %s (0x%04X)", lbl->name, lbl->address);
                 }
                 else
                 {
-                    fprintf(stderr, " %d", o);
+                    fprintf(stderr, " 0x%04X", o);
                 }
             }
             else
@@ -203,6 +203,9 @@ unsigned int dumpInstructionAtAddress(const unsigned int addr)
     }
     
     fprintf(stderr, "\n");
+    
+    if (i == 0 || i == 6 || i == 18)
+        fprintf(stderr, "\n");
     
     return operandCount + 1;
 }
