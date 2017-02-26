@@ -15,6 +15,7 @@
 #include "instruction.h"
 #include "processor.h"
 
+#include "debug.h"
 
 
 bool unasm = false;
@@ -94,9 +95,9 @@ int main(int argc, const char *argv[])
             
             if (debug && unasm)
             {
-                scanForLabels(0, size / 2);
+                scanForLabels(0, size >> 1);
                 
-                dumpAllInstructions(0, size / 2);
+                dumpInstructionsFromRange(0, size >> 1);
             }
             else
             {

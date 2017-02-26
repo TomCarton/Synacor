@@ -6,12 +6,17 @@
 //
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <memory.h>
 
 #include "label.h"
 #include "instruction.h"
 #include "processor.h"
 
 #include "debug.h"
+
+
+static const unsigned int kMaxOperandCount = 3;
 
 
 // MARK: - Helpers
@@ -28,6 +33,31 @@ const char *b2a(unsigned short val)
     }
     
     return binaryString;
+}
+
+const char rchar(unsigned char c)
+{
+    return ((c & 0xFF) > 31 && (c & 0xFF) < 127) ? c : '.';
+}
+
+void addPadding(unsigned int count)
+{
+    count = count > kLabelMaxSize ? kLabelMaxSize : count;
+    
+    // pad
+    char padding[kLabelMaxSize + 1];
+    
+    for (unsigned int i = 0; i < kLabelMaxSize; ++i)
+    {
+        padding[i] = ' ';
+    }
+    padding[kLabelMaxSize] = '\0';
+    
+    char pad[kLabelMaxSize + 1];
+    strcpy(pad, padding);
+    pad[count] = '\0';
+    
+    fprintf(stderr, "%s", pad);
 }
 
 
@@ -52,7 +82,7 @@ void dumpRegisters(unsigned short rbitfield)
         rbitfield = 255;
     }
 
-    fprintf(stderr, "\n  REGISTERS\n -----------------------------------------\n");
+    fprintf(stderr, "\n  REGISTERS\n ------------------------------------------\n");
     
     short mask = 1;
     
@@ -60,17 +90,12 @@ void dumpRegisters(unsigned short rbitfield)
     {
         if (rbitfield & mask)
         {
-            byte c1 = reg[i] >> 8;
-            if (c1 < 11 || c1 > 127) c1 = '.';
-            byte c2 = reg[i];
-            if (c2 < 11 || c2 > 127) c2 = '.';
-            
-            fprintf(stderr, "  R%i: %05d 0x%04X %s  '%c%c'\n", i, reg[i], reg[i], b2a(reg[i]), c1, c2);
+            fprintf(stderr, "  R%i: %5d 0x%04X %s '%c%c'\n", i, reg[i], reg[i], b2a(reg[i]), rchar(reg[i] >> 8), rchar(reg[i]));
         }
         mask <<= 1;
     }
     
-    fprintf(stderr, " -----------------------------------------\n");
+    fprintf(stderr, " ------------------------------------------\n");
 }
 
 void dumpStack()
@@ -80,9 +105,9 @@ void dumpStack()
     unsigned int count = kStackSize - sp;
     for (unsigned int i = 0; i < count; ++i)
     {
-        word val = stack[kStackSize - i];
+        word val = stack[sp + i];
         
-        fprintf(stderr, " %3d: 0x%04X %5d  %s\n", i, val, val, b2a(val));
+        fprintf(stderr, " %3d: %5d 0x%04X %s  '%c%c'\n", i, val, val, b2a(val), rchar(reg[i] >> 8), rchar(reg[i]));
     }
     
     fprintf(stderr, " -----------------------------------------\n");
@@ -98,7 +123,7 @@ void dumpInstructions(const unsigned int addr, unsigned int icount)
     }
 }
 
-void dumpAllInstructions(const unsigned int start, unsigned int end)
+void dumpInstructionsFromRange(const unsigned int start, unsigned int end)
 {
     for (unsigned int a = start; a < end; )
     {
@@ -146,10 +171,8 @@ void dumpMemory(const unsigned int start, unsigned int end)
             
             js = 60 + (j * 2);
 
-            c = val & 0x00FF;
-            line[js] = (c > 10 && c < 128) ? c : '.';
-            c = (val & 0xFF) >> 8;
-            line[js + 1] = (c > 10 && c < 128) ? c : '.';
+            line[js] = rchar(val);
+            line[js + 1] = rchar(val >> 8);
         }
         line[80] = '\0';
         
@@ -158,4 +181,109 @@ void dumpMemory(const unsigned int start, unsigned int end)
     }
     
     fprintf(stderr, " ---------------------------------------------------------------------------------------\n");
+}
+
+unsigned int dumpInstructionAtAddress(const unsigned int addr)
+{
+    word opcode = mem[addr];
+    
+    if (opcode > instructionCount - 1)
+        opcode = instructionCount - 1;
+    
+    unsigned int operandCount = instructions[opcode].operandCount;
+    
+    
+    // memory
+    fprintf(stderr, "  0x%06X: %04X ", addr, mem[addr]);
+    for (unsigned int i = 0; i < operandCount; ++i)
+    {
+        fprintf(stderr, " %04X", mem[addr + i + 1]);
+    }
+    
+    // pad
+    addPadding(2 + (kMaxOperandCount - operandCount) * 5);
+    
+    
+    // label
+    Label *label = NULL;
+    for (unsigned int i = 0; i < labelCount; ++i)
+    {
+        if (labels[i].address == addr)
+        {
+            label = &labels[i];
+            break;
+        }
+    }
+    if (label)
+    {
+        fprintf(stderr, "%s:", label->name);
+        addPadding(kLabelMaxSize - (unsigned int)strlen(label->name) - 1);
+    }
+    else
+    {
+        addPadding(kLabelMaxSize);
+    }
+    
+    
+    // instruction
+    fprintf(stderr, "%s", instructions[opcode].name);
+    
+    // output string
+    if (mem[addr] == 19 && mem[addr + 1] < kMemSize)
+    {
+        unsigned int ad = addr;
+        
+        fprintf(stderr, " '");
+        
+        char c = 0;
+        while (mem[ad] == 19)
+        {
+            c = mem[ad + 1];
+            if (c == 0 || c == 10)
+                break;
+            
+            fprintf(stderr, "%c", c);
+            
+            ad += 2;
+            operandCount += 2;
+        }
+        
+        fprintf(stderr, "' (%d)", c);
+    }
+    else
+    {
+        // operands
+        for (unsigned int i = 0; i < operandCount; ++i)
+        {
+            word o = mem[addr + 1 + i];
+            
+            Label *lbl = NULL;
+            if (o >= kMemSize && o < kMemSize + kRegisterCount)
+            {
+                fprintf(stderr, " r%d", o & 7);
+            }
+            else if (o < kMemSize)
+            {
+                if (instructions[opcode].lind && i == instructions[opcode].lind - 1 && (lbl = labelAtAddress(o)))
+                {
+                    fprintf(stderr, " %s (0x%04X)", lbl->name, lbl->address);
+                }
+                else
+                {
+                    fprintf(stderr, " 0x%04X", o);
+                }
+            }
+            else
+            {
+                fprintf(stderr, " ??");
+            }
+        }
+    }
+    
+    fprintf(stderr, "\n");
+    
+    if (instructions[opcode].space)
+        fprintf(stderr, "\n");
+    
+    return operandCount + 1;
 }

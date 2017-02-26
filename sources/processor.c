@@ -21,7 +21,7 @@
 const unsigned int kMemSize = 1 << 15;
 const unsigned int kMemMask = kMemSize - 1;
 
-const unsigned int kStackSize = 1 << 15;
+const unsigned int kStackSize = 32; //1 << 15;
 
 const unsigned int kRegisterCount = 8;
 
@@ -321,23 +321,6 @@ unsigned int runInstructionAtAddress(unsigned int address)
             break;
         }
             
-            
-            
-//        {
-//            word a = mem_arg(&PTR);
-//            word b = mem_arg(&PTR);
-//            
-//            mem_write(a, mem_read(mem_resolve(b)));
-//        }
-//            
-//            void wmem_state(void)
-//        {
-//            word a = mem_arg(&PTR);
-//            word b = mem_arg(&PTR);
-//            
-//            mem_write(mem_resolve(a), mem_resolve(b));
-//        }
-            
         case 15: // rmem: 15 a b
         {
             word a = mem[address++];
@@ -412,18 +395,6 @@ unsigned int runInstructionAtAddress(unsigned int address)
     return instructionLength(i);
 }
 
-void experimente()
-{
-    reg[0] = 26299;
-    pc = 15618;
-    active = true;
-    while (active)
-    {
-        unsigned int sz = runInstructionAtAddress(pc);
-        pc += sz;
-    }
-}
-
 void run()
 {
     active = true;
@@ -437,6 +408,8 @@ void run()
             dumpInstructionAtAddress(pc);
             printf("*-- Breakpoint --------------------\n");
 
+            dumpStack();
+            
 //            raise(SIGINT);
 //            active = false;
             debug = true;

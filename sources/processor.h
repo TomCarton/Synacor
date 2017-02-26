@@ -30,9 +30,6 @@ extern bool debug;
 
 void reset();
 
-void dumpRegisters(unsigned short rbitfield);
-void dumpInstructions(const unsigned int addr, unsigned int icount);
-void dumpAllInstructions(const unsigned int start, unsigned int end);
 unsigned int runInstructionAtAddress(unsigned int address);
 
 void setBreakpoint(unsigned int address, byte active);
