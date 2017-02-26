@@ -40,8 +40,10 @@ int main(int argc, const char *argv[])
 {
     char filename[PATH_MAX] = "\0";
     strcpy(filename, "/Users/thomascarton/Work/Tom/Synacor/challenge.bin");
+
 //    debug = true;
 //    unasm = true;
+
 //    if (argc < 2)
 //        goto usage;
     
@@ -88,7 +90,7 @@ int main(int argc, const char *argv[])
         unsigned int size = readFile(filename);
         if (size > 0)
         {
-//            setBreakpoint(1458, 1);
+            setBreakpoint(1458, 1);
             
             if (debug && unasm)
             {

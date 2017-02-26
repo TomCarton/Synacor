@@ -16,42 +16,48 @@
 #include "instruction.h"
 
 
-extern word mem[];
-extern const unsigned int kMemSize;
-
 static const unsigned int kMaxOperandCount = 3;
 
 
-unsigned int instructionLength(word instruction)
+Instruction Instructions[] =
 {
-    switch (instruction)
-    {
-        case 0: return 1; // halt: 0
-        case 1: return 3; // set:  1 a b
-        case 2: return 2; // push: 2 a
-        case 3: return 2; // pop: 3 a
-        case 4: return 4; // eq: 4 a b c
-        case 5: return 4; // gt: 5 a b c
-        case 6: return 2; // jmp: 6 a
-        case 7: return 3; // jt: 7 a b
-        case 8: return 3; // jf: 8 a b
-        case 9: return 4; // add: 9 a b c
-        case 10: return 4; // mult: 10 a b c
-        case 11: return 4; // mod: 11 a b c
-        case 12: return 4; // and: 12 a b c
-        case 13: return 4; // or: 13 a b c
-        case 14: return 3; // not: 14 a b
-        case 15: return 3; // rmem: 15 a b
-        case 16: return 3; // wmem: 16 a b
-        case 17: return 2; // call: 17 a
-        case 18: return 1; // ret: 18
-        case 19: return 2; // out: 19 a
-        case 20: return 2; // in: 20 a
-        case 21: return 1; // noop: 21
-    }
-    
-    return 1;
+    // op   name    oc in sp
+    { 0x00, "HALT", 0, 0, 1, }, // halt: 0
+    { 0x01, "SET",  2, 0, 0, }, // set: 1 a b
+    { 0x02, "PUSH", 1, 0, 0, }, // push: 2 a
+    { 0x03, "POP",  1, 0, 0, }, // pop: 3 a
+    { 0x04, "EQ",   3, 0, 0, }, // eq: 4 a b c
+    { 0x05, "GT",   3, 0, 0, }, // gt: 5 a b c
+    { 0x06, "JMP",  1, 1, 1, }, // jmp: 6 a
+    { 0x07, "JT",   2, 2, 1, }, // jt: 7 a b
+    { 0x08, "JF",   2, 2, 1, }, // jf: 8 a b
+    { 0x09, "ADD",  3, 0, 0, }, // add: 9 a b c
+    { 0x0A, "MULT", 3, 0, 0, }, // mult: 10 a b c
+    { 0x0B, "MOD",  3, 0, 0, }, // mod: 11 a b c
+    { 0x0C, "AND",  3, 0, 0, }, // and: 12 a b c
+    { 0x0D, "OR",   3, 0, 0, }, // or: 13 a b c
+    { 0x0E, "NOT",  2, 0, 0, }, // not: 14 a b
+    { 0x0F, "RMEM", 2, 0, 0, }, // rmem: 15 a b
+    { 0x10, "WMEM", 2, 0, 0, }, // wmem: 16 a b
+    { 0x11, "CALL", 1, 1, 1, }, // call: 17 a
+    { 0x12, "RET",  0, 0, 1, }, // ret: 18
+    { 0x13, "OUT",  1, 1, 0, }, // out: 19 a
+    { 0x14, "IN",   1, 0, 0, }, // in: 20 a
+    { 0x13, "NOOP", 0, 0, 0, }, // noop: 21
+
+    { 0xffff, "???", 0, 0, 0, },
+};
+
+unsigned int instructionCount = sizeof(Instructions) / sizeof(Instructions[0]);
+
+
+unsigned int instructionLength(word opcode)
+{
+    return (opcode <= 0x13) ? Instructions[opcode].operandCount + 1: 1;
 }
+
+
+// MARK: - Helpers
 
 void addPadding(unsigned int count)
 {
@@ -75,36 +81,13 @@ void addPadding(unsigned int count)
 
 unsigned int dumpInstructionAtAddress(const unsigned int addr)
 {
-    word i = mem[addr];
+    word opcode = mem[addr];
     
-    char inst[] = "???\0\0";
-    unsigned int operandCount = 0;
+    if (opcode > instructionCount - 1)
+        opcode = instructionCount - 1;
+
+    unsigned int operandCount = Instructions[opcode].operandCount;
     
-    switch (i)
-    {
-        case 0: strcpy(inst, "HALT"); operandCount = 0; break;     // halt: 0
-        case 1: strcpy(inst, "SET"); operandCount = 2; break;      // set:  1 a b
-        case 2: strcpy(inst, "PUSH"); operandCount = 1; break;     // push: 2 a
-        case 3: strcpy(inst, "POP"); operandCount = 1; break;      // pop: 3 a
-        case 4: strcpy(inst, "EQ"); operandCount = 3; break;       // eq: 4 a b c
-        case 5: strcpy(inst, "GT"); operandCount = 3; break;       // gt: 5 a b c
-        case 6: strcpy(inst, "JMP"); operandCount = 1; break;      // jmp: 6 a
-        case 7: strcpy(inst, "JT"); operandCount = 2; break;       // jt: 7 a b
-        case 8: strcpy(inst, "JF"); operandCount = 2; break;       // jf: 8 a b
-        case 9: strcpy(inst, "ADD"); operandCount = 3; break;      // add: 9 a b c
-        case 10: strcpy(inst, "MULT"); operandCount = 3; break;    // mult: 10 a b c
-        case 11: strcpy(inst, "MOD"); operandCount = 3; break;     // mod: 11 a b c
-        case 12: strcpy(inst, "AND"); operandCount = 3; break;     // and: 12 a b c
-        case 13: strcpy(inst, "OR"); operandCount = 3; break;      // or: 13 a b c
-        case 14: strcpy(inst, "NOT"); operandCount = 2; break;     // not: 14 a b
-        case 15: strcpy(inst, "RMEM"); operandCount = 2; break;    // rmem: 15 a b
-        case 16: strcpy(inst, "WMEM"); operandCount = 2; break;    // wmem: 16 a b
-        case 17: strcpy(inst, "CALL"); operandCount = 1; break;    // call: 17 a
-        case 18: strcpy(inst, "RET"); operandCount = 0; break;     // ret: 18
-        case 19: strcpy(inst, "OUT"); operandCount = 1; break;     // out: 19 a
-        case 20: strcpy(inst, "IN"); operandCount = 1; break;      // in: 20 a
-        case 21: strcpy(inst, "NOOP"); operandCount = 0; break;    // noop: 21
-    }
     
     // memory
     fprintf(stderr, "  0x%06X: %04X ", addr, mem[addr]);
@@ -115,6 +98,7 @@ unsigned int dumpInstructionAtAddress(const unsigned int addr)
     
     // pad
     addPadding(2 + (kMaxOperandCount - operandCount) * 5);
+
     
     // label
     Label *label = NULL;
@@ -136,8 +120,9 @@ unsigned int dumpInstructionAtAddress(const unsigned int addr)
         addPadding(kLabelMaxSize);
     }
     
+    
     // instruction
-    fprintf(stderr, "%s", inst);
+    fprintf(stderr, "%s", Instructions[opcode].name);
     
     // output string
     if (mem[addr] == 19 && mem[addr + 1] < kMemSize)
@@ -163,17 +148,6 @@ unsigned int dumpInstructionAtAddress(const unsigned int addr)
     }
     else
     {
-        // label
-        unsigned int lind = operandCount;
-        if (mem[addr] == 6 || mem[addr] == 17 || mem[addr] == 19)
-        {
-            lind = 0;
-        }
-        else if (mem[addr] == 7 || mem[addr] == 8)
-        {
-            lind = 1;
-        }
-        
         // operands
         for (unsigned int i = 0; i < operandCount; ++i)
         {
@@ -186,7 +160,7 @@ unsigned int dumpInstructionAtAddress(const unsigned int addr)
             }
             else if (o < kMemSize)
             {
-                if (i == lind && (lbl = labelAtAddress(o)))
+                if (Instructions[opcode].lind && i == Instructions[opcode].lind - 1 && (lbl = labelAtAddress(o)))
                 {
                     fprintf(stderr, " %s (0x%04X)", lbl->name, lbl->address);
                 }
@@ -204,7 +178,7 @@ unsigned int dumpInstructionAtAddress(const unsigned int addr)
     
     fprintf(stderr, "\n");
     
-    if (i == 0 || i == 6 || i == 18)
+    if (Instructions[opcode].space)
         fprintf(stderr, "\n");
     
     return operandCount + 1;

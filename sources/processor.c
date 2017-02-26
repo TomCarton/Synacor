@@ -13,6 +13,7 @@
 
 #include "types.h"
 #include "instruction.h"
+#include "debug.h"
 
 #include "processor.h"
 
@@ -40,62 +41,6 @@ bool debug = false;
 byte breakpoint[kMemSize / 2];
 
 
-// MARK: - Helpers
-
-const char *b2a(unsigned short val)
-{
-    static char binaryString[] = "0b................";
- 
-    unsigned int mask = 0x8000;
-    for (unsigned int i = 0; i < 16; ++i)
-    {
-        binaryString[i + 2] = val & mask ? '1' : '0';
-        mask >>= 1;
-    }
-    
-    return binaryString;
-}
-
-void dumpRegisters(unsigned short rbitfield)
-{
-    if (rbitfield == 0)
-    {
-        rbitfield = 255;
-    }
-    
-    fprintf(stderr, "\n  REGISTERS\n -----------------------------------------\n");
-    
-    short mask = 1;
-    
-    for (unsigned int i = 0; i < 8; ++i)
-    {
-        if (rbitfield & mask)
-        {
-            fprintf(stderr, "  R%i: 0x%04X %s %d '%c'\n", i, reg[i], b2a(reg[i]), reg[i], reg[i]);
-        }
-        mask <<= 1;
-    }
-    
-    fprintf(stderr, " -----------------------------------------\n");
-}
-
-void dumpInstructions(const unsigned int addr, unsigned int icount)
-{
-    unsigned int a = addr;
-    
-    while (icount--)
-    {
-        a += dumpInstructionAtAddress(a);
-    }
-}
-
-void dumpAllInstructions(const unsigned int start, unsigned int end)
-{
-    for (unsigned int a = start; a < end; )
-    {
-        a += dumpInstructionAtAddress(a);
-    }
-}
 
 
 // MARK: - Value

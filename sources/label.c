@@ -21,7 +21,6 @@
 extern word mem[];
 
 
-unsigned int labelCount = 166;
 Label labels[] =
 {
     {0x0000, "Start"},
@@ -197,18 +196,8 @@ Label labels[] =
     {0x17a0, "LBL_163"},
 };
 
+unsigned int labelCount = sizeof(labels) / sizeof(labels[0]);
 
-void dumpLabels()
-{
-    fprintf(stderr, "Label labels[%d] = \n{\n", labelCount);
-    
-    for (unsigned int i = 0; i < labelCount; ++i)
-    {
-        fprintf(stderr, "    {0x%04x, \"%s\"}, \n", labels[i].address, labels[i].name);
-    }
-
-    fprintf(stderr, "};\n");
-}
 
 Label *labelAtAddress(const unsigned int address)
 {
