@@ -24,6 +24,8 @@ extern Instruction instructions[];
 
 unsigned int instructionLength(word instruction);
 
+unsigned int runInstructionAtAddress(unsigned int address);;
+
 unsigned int dumpInstructionAtAddress(const unsigned int addr);
 
 #endif /* instruction_h */

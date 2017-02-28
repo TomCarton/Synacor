@@ -14,11 +14,9 @@
 
 #include "types.h"
 #include "instruction.h"
+#include "processor.h"
 
 #include "label.h"
-
-
-extern word mem[];
 
 
 Label labels[] =
@@ -43,8 +41,9 @@ Label labels[] =
     {0x034b, "TestMemSlot"},
     {0x034d, "TestMem"},
     {0x03ad, "ErrWmem"},
-    {0x03ff, "LBL_32"},
-    {0x03e8, "LBL_33"},
+    {0x03D2, "Begin"},
+    {0x03ff, "_end"},
+    {0x03e8, "_loop"},
     {0x0432, "ErrNoJtJf"},
     {0x0445, "ErrRegs"},
     {0x045e, "ErrSetOp"},
@@ -55,18 +54,21 @@ Label labels[] =
     {0x04d7, "ErrRmemOp"},
     {0x04ee, "ErrWmemOp"},
     {0x0505, "TestCallOp"},
+    {0x0507, "TestCallOp2"},
     {0x0509, "ErrCallOp"},
     {0x0520, "ErrModulo"},
     {0x0565, "ErrHitchhiking"},
     {0x0586, "ErrMultOp"},
     {0x059d, "ErrModOp"},
     
-    {0x05c8, "Loop"},
-    {0x05e3, "EndLoop"},
+    {0x05c8, "_loop"},
+    {0x05e3, "_end"},
 
     {0x05f8, "OutputR0"},
+    {0x0645, "Method2"},
+    {0x0652, "_end"},
     {0x084d, "Unhash"},
-
+    
     // --- --- --- --- ---
     
     {0x05b2, "Label01"},
@@ -75,7 +77,6 @@ Label labels[] =
     {0x061b, "Label04"},
     {0x061e, "Label05"},
     {0x0623, "Label06"},
-    {0x0652, "Label07"},
     {0x066d, "Label08"},
     {0x0682, "Label09"},
     {0x0683, "Label10"},
@@ -219,13 +220,13 @@ void scanForLabels(const unsigned int addr, const unsigned int end)
     for (unsigned int a = addr; a < end;)
     {
         unsigned int address = 0;
-        if (mem[a] == 6 || mem[a] == 17)
+        if (memory[a] == 6 || memory[a] == 17)
         {
-            address = mem[a + 1];
+            address = memory[a + 1];
         }
-        else if (mem[a] == 7 || mem[a] == 8)
+        else if (memory[a] == 7 || memory[a] == 8)
         {
-            address = mem[a + 2];
+            address = memory[a + 2];
         }
 
         if (address && labelAtAddress(address) == NULL)
@@ -236,6 +237,6 @@ void scanForLabels(const unsigned int addr, const unsigned int end)
             ++labelCount;
         }
         
-        a += instructionLength(mem[a]);
+        a += instructionLength(memory[a]);
     }
 }

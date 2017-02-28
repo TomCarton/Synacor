@@ -61,7 +61,7 @@ void addPadding(unsigned int count)
 }
 
 
-// MARK: -
+// MARK: - Labels
 
 void dumpLabels()
 {
@@ -74,6 +74,9 @@ void dumpLabels()
     
     fprintf(stderr, "};\n");
 }
+
+
+// MARK: - Registers
 
 void dumpRegisters(unsigned short rbitfield)
 {
@@ -90,13 +93,17 @@ void dumpRegisters(unsigned short rbitfield)
     {
         if (rbitfield & mask)
         {
-            fprintf(stderr, "  R%i: %5d 0x%04X %s '%c%c'\n", i, reg[i], reg[i], b2a(reg[i]), rchar(reg[i] >> 8), rchar(reg[i]));
+            word reg = memory[32768 + i];
+            fprintf(stderr, "  R%i: %5d 0x%04X %s '%c%c'\n", i, reg, reg, b2a(reg), rchar(reg >> 8), rchar(reg));
         }
         mask <<= 1;
     }
     
     fprintf(stderr, " ------------------------------------------\n");
 }
+
+
+// MARK: - Stack
 
 void dumpStack()
 {
@@ -107,29 +114,14 @@ void dumpStack()
     {
         word val = stack[sp + i];
         
-        fprintf(stderr, " %3d: %5d 0x%04X %s  '%c%c'\n", i, val, val, b2a(val), rchar(reg[i] >> 8), rchar(reg[i]));
+        fprintf(stderr, " %3d: %5d 0x%04X %s  '%c%c'\n", i, val, val, b2a(val), rchar(val >> 8), rchar(val));
     }
     
     fprintf(stderr, " -----------------------------------------\n");
 }
 
-void dumpInstructions(const unsigned int addr, unsigned int icount)
-{
-    unsigned int a = addr;
-    
-    while (icount--)
-    {
-        a += dumpInstructionAtAddress(a);
-    }
-}
 
-void dumpInstructionsFromRange(const unsigned int start, unsigned int end)
-{
-    for (unsigned int a = start; a < end; )
-    {
-        a += dumpInstructionAtAddress(a);
-    }
-}
+// MARK: - Memory
 
 void dumpMemory(const unsigned int start, unsigned int end)
 {
@@ -146,18 +138,18 @@ void dumpMemory(const unsigned int start, unsigned int end)
         for (j = 0; j < size; ++j)
         {
             unsigned int js = j * 6;
-            word val = mem[p + j];
+            word val = memory[p + j];
             
             unsigned char c = (val & 0x00F0) >> 4;
             c += c < 10 ? '0' : 'A' - 10;
             line[js] = c;
-
+            
             c = (val & 0x000F) >> 0;
             c += c < 10 ? '0' : 'A' - 10;
             line[js + 1] = c;
             
             line[js + 2] = ' ';
-
+            
             c = (val & 0xF000) >> 12;
             c += c < 10 ? '0' : 'A' - 10;
             line[js + 3] = c;
@@ -170,7 +162,7 @@ void dumpMemory(const unsigned int start, unsigned int end)
             
             
             js = 60 + (j * 2);
-
+            
             line[js] = rchar(val);
             line[js + 1] = rchar(val >> 8);
         }
@@ -183,9 +175,12 @@ void dumpMemory(const unsigned int start, unsigned int end)
     fprintf(stderr, " ---------------------------------------------------------------------------------------\n");
 }
 
+
+// MARK: - Instructions
+
 unsigned int dumpInstructionAtAddress(const unsigned int addr)
 {
-    word opcode = mem[addr];
+    word opcode = memory[addr];
     
     if (opcode > instructionCount - 1)
         opcode = instructionCount - 1;
@@ -194,10 +189,10 @@ unsigned int dumpInstructionAtAddress(const unsigned int addr)
     
     
     // memory
-    fprintf(stderr, "  0x%06X: %04X ", addr, mem[addr]);
+    fprintf(stderr, "%c %c 0x%04X-%05d: %04X ", addr == pc ? '>' : ' ', isBreakpointAtAddress(addr) ? '*' : ' ', addr, addr, memory[addr]);
     for (unsigned int i = 0; i < operandCount; ++i)
     {
-        fprintf(stderr, " %04X", mem[addr + i + 1]);
+        fprintf(stderr, " %04X", memory[addr + i + 1]);
     }
     
     // pad
@@ -229,16 +224,16 @@ unsigned int dumpInstructionAtAddress(const unsigned int addr)
     fprintf(stderr, "%s", instructions[opcode].name);
     
     // output string
-    if (mem[addr] == 19 && mem[addr + 1] < kMemSize)
+    if (memory[addr] == 19 && memory[addr + 1] < kMemSize)
     {
         unsigned int ad = addr;
         
         fprintf(stderr, " '");
         
         char c = 0;
-        while (mem[ad] == 19)
+        while (memory[ad] == 19)
         {
-            c = mem[ad + 1];
+            c = memory[ad + 1];
             if (c == 0 || c == 10)
                 break;
             
@@ -255,7 +250,7 @@ unsigned int dumpInstructionAtAddress(const unsigned int addr)
         // operands
         for (unsigned int i = 0; i < operandCount; ++i)
         {
-            word o = mem[addr + 1 + i];
+            word o = memory[addr + 1 + i];
             
             Label *lbl = NULL;
             if (o >= kMemSize && o < kMemSize + kRegisterCount)
@@ -264,9 +259,9 @@ unsigned int dumpInstructionAtAddress(const unsigned int addr)
             }
             else if (o < kMemSize)
             {
-                if (instructions[opcode].lind && i == instructions[opcode].lind - 1 && (lbl = labelAtAddress(o)))
+                if (instructions[opcode].lind && i == instructions[opcode].lind - 1 && o > 16 && (lbl = labelAtAddress(o)))
                 {
-                    fprintf(stderr, " %s (0x%04X)", lbl->name, lbl->address);
+                    fprintf(stderr, " %s(0x%04X)", lbl->name, lbl->address);
                 }
                 else
                 {
@@ -286,4 +281,22 @@ unsigned int dumpInstructionAtAddress(const unsigned int addr)
         fprintf(stderr, "\n");
     
     return operandCount + 1;
+}
+
+void dumpInstructions(const unsigned int addr, unsigned int icount)
+{
+    unsigned int a = addr;
+    
+    while (icount--)
+    {
+        a += dumpInstructionAtAddress(a);
+    }
+}
+
+void dumpInstructionsFromRange(const unsigned int start, unsigned int end)
+{
+    for (unsigned int a = start; a < end; )
+    {
+        a += dumpInstructionAtAddress(a);
+    }
 }

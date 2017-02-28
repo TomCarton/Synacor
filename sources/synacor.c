@@ -30,7 +30,7 @@ unsigned int readFile(const char *filename)
         return -1;
     }
     
-    int sizeread = (unsigned int)fread(mem, 1, 32768, f);
+    int sizeread = (unsigned int)fread(memory, 1, 65536, f);
     
     fclose(f);
     
@@ -40,13 +40,10 @@ unsigned int readFile(const char *filename)
 int main(int argc, const char *argv[])
 {
     char filename[PATH_MAX] = "\0";
-    strcpy(filename, "/Users/thomascarton/Work/Tom/Synacor/challenge.bin");
+//    strcpy(filename, "/Users/thomascarton/Work/Tom/Synacor/challenge.bin");
 
-//    debug = true;
-//    unasm = true;
-
-//    if (argc < 2)
-//        goto usage;
+    if (argc < 2)
+        goto usage;
     
     // read parameters
     for (unsigned int i = 1; i < argc; ++i)
@@ -90,9 +87,7 @@ int main(int argc, const char *argv[])
         
         unsigned int size = readFile(filename);
         if (size > 0)
-        {
-            setBreakpoint(1458, 1);
-            
+        {            
             if (debug && unasm)
             {
                 scanForLabels(0, size >> 1);
