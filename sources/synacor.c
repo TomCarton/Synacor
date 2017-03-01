@@ -40,10 +40,13 @@ unsigned int readFile(const char *filename)
 int main(int argc, const char *argv[])
 {
     char filename[PATH_MAX] = "\0";
-//    strcpy(filename, "/Users/thomascarton/Work/Tom/Synacor/challenge.bin");
-
-    if (argc < 2)
-        goto usage;
+    
+#   if DEBUG
+        strcpy(filename, "/Users/thomascarton/Work/Tom/Synacor/challenge.bin");
+#   else
+        if (argc < 2)
+            goto usage;
+#   endif
     
     // read parameters
     for (unsigned int i = 1; i < argc; ++i)

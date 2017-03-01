@@ -201,6 +201,18 @@ Label labels[] =
 unsigned int labelCount = sizeof(labels) / sizeof(labels[0]);
 
 
+void listLabels()
+{
+    fprintf(stderr, "\n  LABELS\n ------------------------------------------\n");
+    
+    for (unsigned int i = 0; i < labelCount; ++i)
+    {
+        fprintf(stderr, "  0x%04x:%05d - %s\n", labels[i].address, labels[i].address, labels[i].name);
+    }
+    
+    fprintf(stderr, " ------------------------------------------\n");
+}
+
 Label *labelAtAddress(const unsigned int address)
 {
     for (unsigned int i = 0; i < labelCount; ++i)

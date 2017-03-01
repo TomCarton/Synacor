@@ -13,6 +13,8 @@
 #include "label.h"
 #include "processor.h"
 
+#include "console.h"
+
 #include "instruction.h"
 
 
@@ -305,6 +307,16 @@ unsigned int runInstructionAtAddress(unsigned int address)
 
             char c = getchar();
 
+            if (c == '>')
+            {
+                getchar();
+
+                if (startConsole())
+                    return 0;
+
+                c = getchar();
+            }
+            
             setMemory(a, c);
             
             break;

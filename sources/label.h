@@ -20,7 +20,8 @@ extern unsigned int labelCount;
 extern Label labels[];
 
 
-void dumpLabels();
+void listLabels();
+
 Label *labelAtAddress(const unsigned int address);
 
 void scanForLabels(const unsigned int addr, const unsigned int end);
