@@ -300,3 +300,43 @@ void dumpInstructionsFromRange(const unsigned int start, unsigned int end)
         a += dumpInstructionAtAddress(a);
     }
 }
+
+
+// MARK: load/save
+
+void loadFromFile(const char *filename)
+{
+    FILE *file = fopen(filename, "rb");
+    if (file)
+    {
+        // load memory + registers
+        fread(memory, sizeof(word), kMemSize + kRegisterCount, file);
+        fread(&pc, sizeof(word), 1, file);
+        
+        // stack
+        fread(stack, sizeof(word), kStackSize, file);
+        
+        fclose(file);
+        
+        printf(">>> load fom file %s\n", filename);
+    }
+}
+
+void saveToFile(const char *filename)
+{
+    FILE *file = fopen(filename, "wb");
+    if (file)
+    {
+        // save memory + registers
+        fwrite(memory, sizeof(word), kMemSize + kRegisterCount, file);
+        fwrite(&pc, sizeof(word), 1, file);
+
+        // stack
+        fwrite(stack, sizeof(word), kStackSize, file);
+        
+        fclose(file);
+    
+        printf(">>> saved to file %s\n", filename);
+    }
+}
+

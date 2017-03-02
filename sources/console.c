@@ -8,41 +8,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "label.h"
-
-#include "debug.h"
+#include "command.h"
 
 #include "console.h"
 
-
-typedef bool (*fp)(char *);
-
-typedef struct
-{
-    char name[16];
-    fp function;
-} Command;
-
-
-bool funcHelp(char *param);
-bool funcRegisters(char *param);
-bool funcLabels(char *param);
-bool funcStack(char *param);
-bool funcExit(char *param);
-
-
-Command commands[] =
-{
-    { "help", &funcHelp },
-    
-    { "registers", &funcRegisters },
-    { "stack", &funcStack },
-    { "labels", &funcLabels },
-    
-    { "exit", &funcExit },
-};
-
-unsigned int commandCount = sizeof(commands) / sizeof(commands[0]);
 
 char commandBuffer[256] = "\0";
 
@@ -53,7 +22,7 @@ bool funcHelp(char *param)
 
     for (unsigned int i = 0; i < commandCount; ++i)
     {
-        fprintf(stderr, "  %s\n", commands[i].name);
+        fprintf(stderr, "  %s:     \t%s\n", commands[i].name, commands[i].explanation);
     }
 
     fprintf(stderr, " ------------------------------------------\n");
@@ -61,37 +30,11 @@ bool funcHelp(char *param)
     return true;
 }
 
-bool funcRegisters(char *param)
-{
-    dumpRegisters(0b11111111);
-    
-    return true;
-}
-
-bool funcLabels(char *param)
-{
-    listLabels();
-    
-    return true;
-}
-
-bool funcStack(char *param)
-{
-    dumpStack();
-    
-    return true;
-}
-
-bool funcExit(char *param)
-{
-    return false;
-}
-
-
 bool isCommand(const char *command)
 {
     return strncmp(commandBuffer, command, strlen(command)) == 0;
 }
+
 
 bool startConsole()
 {
