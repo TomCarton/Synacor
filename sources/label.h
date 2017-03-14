@@ -12,8 +12,6 @@
 
 
 #define kLabelMaxSize 20
-
-
 typedef struct { word address; char name[kLabelMaxSize + 1]; } Label;
 
 extern unsigned int labelCount;

@@ -91,16 +91,19 @@ int main(int argc, const char *argv[])
         unsigned int size = readFile(filename);
         if (size > 0)
         {            
-            if (debug && unasm)
+            if (debug)
             {
                 scanForLabels(0, size >> 1);
                 
-                dumpInstructionsFromRange(0, size >> 1);
+                if (unasm)
+                {
+                    dumpInstructionsFromRange(0, size >> 1);
+                 
+                    return 0;
+                }
             }
-            else
-            {
-                run();
-            }
+
+            run();
             
             return 0;
         }

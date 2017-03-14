@@ -94,9 +94,23 @@ void dumpRegisters(unsigned short rbitfield)
         if (rbitfield & mask)
         {
             word reg = memory[32768 + i];
-            fprintf(stderr, "  R%i: %5d 0x%04X %s '%c%c'\n", i, reg, reg, b2a(reg), rchar(reg >> 8), rchar(reg));
+            fprintf(stderr, "  R%i: %05d 0x%04X %s '%c%c'\n", i, reg, reg, b2a(reg), rchar(reg >> 8), rchar(reg));
         }
+        
         mask <<= 1;
+    }
+
+    if ((rbitfield & 3 << 8) && (rbitfield & 255))
+    {
+        fprintf(stderr, " ------------------------------------------\n");
+    }
+    if (rbitfield & 1 << 8)
+    {
+        fprintf(stderr, "  PC: %05d 0x%04X %s\n", pc, pc, b2a(pc));
+    }
+    if (rbitfield & 1 << 9)
+    {
+        fprintf(stderr, "  SP: [%d] 0%05d 0x%04X %s\n", kStackSize - sp, sp, sp,b2a(sp));
     }
     
     fprintf(stderr, " ------------------------------------------\n");
@@ -125,13 +139,13 @@ void dumpStack()
 
 void dumpMemory(const unsigned int start, unsigned int end)
 {
-    fprintf(stderr, "\n  MEMORY\n ---------------------------------------------------------------------------------------\n");
-    
-    char line[81];
+    fprintf(stderr, "\n  MEMORY\n --------------------------------------------------------------------------------------------\n");
     
     unsigned int p = start;
     while (p < end)
     {
+        char line[81] = "                                                                                 ";
+
         fprintf(stderr, "  0x%06X: ", p);
         
         unsigned int j, size = end - p > 10 ? 10 : end - p;
@@ -172,7 +186,7 @@ void dumpMemory(const unsigned int start, unsigned int end)
         p += size;
     }
     
-    fprintf(stderr, " ---------------------------------------------------------------------------------------\n");
+    fprintf(stderr, " --------------------------------------------------------------------------------------------\n");
 }
 
 
@@ -261,7 +275,7 @@ unsigned int dumpInstructionAtAddress(const unsigned int addr)
             {
                 if (instructions[opcode].lind && i == instructions[opcode].lind - 1 && o > 16 && (lbl = labelAtAddress(o)))
                 {
-                    fprintf(stderr, " %s(0x%04X)", lbl->name, lbl->address);
+                    fprintf(stderr, " %s", lbl->name);
                 }
                 else
                 {

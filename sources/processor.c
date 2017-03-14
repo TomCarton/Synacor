@@ -14,6 +14,7 @@
 #include "types.h"
 #include "instruction.h"
 #include "debug.h"
+#include "console.h"
 
 #include "processor.h"
 
@@ -113,6 +114,8 @@ bool isBreakpointAtAddress(unsigned int address)
 
 void run()
 {
+    setBreakpoint(0x6e2, 1);
+    
     active = true;
     while (active)
     {
@@ -120,10 +123,10 @@ void run()
         {
             dumpInstructionAtAddress(pc);
 
-//            raise(SIGINT);
 //            active = false;
-
             debug = true;
+            
+            startConsole();
         }
         else if (debug)
         {
