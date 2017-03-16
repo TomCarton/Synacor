@@ -307,11 +307,11 @@ unsigned int runInstructionAtAddress(unsigned int address)
 
             char c = getchar();
 
-            if (c == '~')
+            if (c == '?')
             {
                 getchar();
 
-                if (startConsole())
+                if (console())
                     return 0;
 
                 c = getchar();

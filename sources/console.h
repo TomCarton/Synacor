@@ -11,7 +11,7 @@
 #import <stdbool.h>
 
 
-bool startConsole();
+bool console();
 
 
 #endif /* console_h */

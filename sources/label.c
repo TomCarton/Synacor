@@ -66,10 +66,11 @@ Label labels[kMaxLabelCount] =
     {0x05b2, "ForEach"},
     {0x05c8, "_loop"},
     {0x05e3, "_end"},
+    
     {0x05ee, "Print"},
-
     {0x05f8, "PrintChar"},
-    {0x061b, "Toto"},
+    {0x0607, "Method"},
+    {0x061b, "_end"},
     
     {0x0645, "Method2"},
     {0x0652, "_end"},

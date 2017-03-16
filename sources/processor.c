@@ -99,14 +99,20 @@ void removeAllBreakpoints()
     memset(breakpoint, 0, kMemSize / 2);
 }
 
+bool isBreakpointAtAddress(unsigned int address)
+{
+    return breakpoint[address >> 1];
+}
+
 void setBreakpoint(unsigned int address, byte active)
 {
     breakpoint[address >> 1] = active;
 }
 
-bool isBreakpointAtAddress(unsigned int address)
+void switchBreakpoint(unsigned int address)
 {
-    return breakpoint[address >> 1];
+    unsigned int a = address >> 1;
+    breakpoint[a] = !breakpoint[a];
 }
 
 
@@ -114,7 +120,9 @@ bool isBreakpointAtAddress(unsigned int address)
 
 void run()
 {
-    setBreakpoint(0x6e2, 1);
+//    setBreakpoint(0x5fb, 1);
+//    setBreakpoint(0x6e2, 1);
+//    setBreakpoint(0xbbe, 1);
     
     active = true;
     while (active)
@@ -123,10 +131,9 @@ void run()
         {
             dumpInstructionAtAddress(pc);
 
-//            active = false;
             debug = true;
             
-            startConsole();
+            console();
         }
         else if (debug)
         {

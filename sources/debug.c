@@ -21,7 +21,7 @@ static const unsigned int kMaxOperandCount = 3;
 
 // MARK: - Helpers
 
-const char *b2a(unsigned short val)
+char *b2a(unsigned short val)
 {
     static char binaryString[] = "0b................";
     
@@ -35,9 +35,112 @@ const char *b2a(unsigned short val)
     return binaryString;
 }
 
-const char rchar(unsigned char c)
+char chr(unsigned char c)
 {
     return ((c & 0xFF) > 31 && (c & 0xFF) < 127) ? c : '.';
+}
+
+
+int eval(const char *str)
+{
+    int v = 0;
+    bool pnt = false;
+    
+    char s[32];
+    unsigned int i = 0;
+    unsigned int j = 0;
+    if (*str == '*')
+    {
+        i = 1;
+        pnt = true;
+    }
+    unsigned int len = (unsigned int)strlen(str);
+    for (; i < len; ++i, ++j)
+    {
+        s[j] = str[i] >= 'a' && str[i] <= 'z' ? str[i] & ~' ' : str[i];
+    }
+    s[len] = '\0';
+    
+    if (s[0] == 'P' && s[1] == 'C' && s[2] == '\0')
+    {
+        v = pc;
+    }
+    else if (s[0] == 'R' && s[2] == '\0')
+    {
+        int i = s[1] - '0';
+        if (i >= 0 && i < 8)
+        {
+            v = memory[32768 + i];
+        }
+    }
+    else if (s[0] == '0' && s[1] == 'X')
+    {
+        char *p = (char *)&s[2];
+        
+        char c;
+        while ((c = *p++))
+        {
+            v <<= 4;
+            
+            if (c >= '0' && c <= '9')
+            {
+                v += c - '0';
+            }
+            else if (c >= 'A' && c <= 'F')
+            {
+                v += 10 + c - 'A';
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+    else if (s[0] == '0' && s[1] == 'B')
+    {
+        char *p = (char *)&s[2];
+        
+        char c;
+        while ((c = *p++))
+        {
+            v <<= 1;
+            
+            if (c == '0' || c == '1')
+            {
+                v += c - '0';
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+    else if (s[0] >= '0' && s[0] <= '9')
+    {
+        char *p = (char *)&s[0];
+        
+        char c;
+        while ((c = *p++))
+        {
+            if (c >= '0' && c <= '9')
+            {
+                v *= 10;
+                
+                v += c - '0';
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+    
+    if (pnt)
+    {
+        v = memory[v];
+    }
+    
+    return v;
 }
 
 void addPadding(unsigned int count)
@@ -94,7 +197,7 @@ void dumpRegisters(unsigned short rbitfield)
         if (rbitfield & mask)
         {
             word reg = memory[32768 + i];
-            fprintf(stderr, "  R%i: %05d 0x%04X %s '%c%c'\n", i, reg, reg, b2a(reg), rchar(reg >> 8), rchar(reg));
+            fprintf(stderr, "  R%i: %05d 0x%04X %s '%c%c'\n", i, reg, reg, b2a(reg), chr(reg >> 8), chr(reg));
         }
         
         mask <<= 1;
@@ -110,7 +213,7 @@ void dumpRegisters(unsigned short rbitfield)
     }
     if (rbitfield & 1 << 9)
     {
-        fprintf(stderr, "  SP: [%d] 0%05d 0x%04X %s\n", kStackSize - sp, sp, sp,b2a(sp));
+        fprintf(stderr, "  SP: %05d 0x%04X %s [%d]\n", sp, sp, b2a(sp), kStackSize - sp);
     }
     
     fprintf(stderr, " ------------------------------------------\n");
@@ -128,7 +231,7 @@ void dumpStack()
     {
         word val = stack[sp + i];
         
-        fprintf(stderr, " %3d: %5d 0x%04X %s  '%c%c'\n", i, val, val, b2a(val), rchar(val >> 8), rchar(val));
+        fprintf(stderr, " %3d: %5d 0x%04X %s  '%c%c'\n", i, val, val, b2a(val), chr(val >> 8), chr(val));
     }
     
     fprintf(stderr, " -----------------------------------------\n");
@@ -177,8 +280,8 @@ void dumpMemory(const unsigned int start, unsigned int end)
             
             js = 60 + (j * 2);
             
-            line[js] = rchar(val);
-            line[js + 1] = rchar(val >> 8);
+            line[js] = chr(val);
+            line[js + 1] = chr(val >> 8);
         }
         line[80] = '\0';
         
@@ -203,7 +306,7 @@ unsigned int dumpInstructionAtAddress(const unsigned int addr)
     
     
     // memory
-    fprintf(stderr, "%c %c 0x%04X-%05d: %04X ", addr == pc ? '>' : ' ', isBreakpointAtAddress(addr) ? '*' : ' ', addr, addr, memory[addr]);
+    fprintf(stderr, "%c %c 0x%04X/%05d: %04X ", addr == pc ? '>' : ' ', isBreakpointAtAddress(addr) ? '*' : ' ', addr, addr, memory[addr]);
     for (unsigned int i = 0; i < operandCount; ++i)
     {
         fprintf(stderr, " %04X", memory[addr + i + 1]);
@@ -316,7 +419,23 @@ void dumpInstructionsFromRange(const unsigned int start, unsigned int end)
 }
 
 
-// MARK: load/save
+// MARK: - breakpoints
+
+void dumpBreakpoints()
+{
+    fprintf(stderr, "\n  BREAKPOINTS\n ------------------------------------------------------------------------------------\n");
+    for (unsigned int i = 0; i < kMemSize; ++i)
+    {
+        if (breakpoint[i])
+        {
+            dumpInstructionAtAddress(i << 1);
+        }
+    }
+    fprintf(stderr, " ------------------------------------------------------------------------------------\n");
+}
+
+
+// MARK: - load/save
 
 void loadFromFile(const char *filename)
 {

@@ -28,6 +28,9 @@ extern bool active;
 extern bool debug;
 
 
+extern byte breakpoint[];
+
+
 // memory
 
 void setMemory(word address, word value);
@@ -39,8 +42,9 @@ void pushStack(word v);
 word popStack();
 
 // breakpoint
-void setBreakpoint(unsigned int address, byte active);
 bool isBreakpointAtAddress(unsigned int address);
+void setBreakpoint(unsigned int address, byte active);
+void switchBreakpoint(unsigned int address);
 
 // execution
 void reset();
