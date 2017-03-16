@@ -28,6 +28,7 @@ bool cmdPrint(unsigned int argc, char **argv);
 bool cmdRegisters(unsigned int argc, char **argv);
 bool cmdStack(unsigned int argc, char **argv);
 bool cmdLabels(unsigned int argc, char **argv);
+bool cmdMemory(unsigned int argc, char **argv);
 
 bool cmdBreakpoints(unsigned int argc, char **argv);
 bool cmdBreakpoint(unsigned int argc, char **argv);
@@ -65,6 +66,7 @@ static const Command kCommands[] =
     { &cmdRegisters, "regs", "r", "display the registers" },
     { &cmdStack, "stack", "st", "display the stack" },
     { &cmdLabels, "labels", "lb", "display the labels" },
+    { &cmdMemory, "memory", "m", "display memory" },
     { NULL, "", "", "" },
     
     { &cmdBreakpoints, "breakpoints", "bk", "display the breakpoints" },
@@ -120,7 +122,19 @@ bool cmdPrint(unsigned int argc, char **argv)
 
 bool cmdDisplay(unsigned int argc, char **argv)
 {
-    dumpInstructions(pc - 20, 20);
+    unsigned int iaddr = pc;
+    unsigned int icount = 1;
+    
+    if (argc > 1)
+    {
+        iaddr = eval(argv[1]);
+    }
+    if (argc > 2)
+    {
+        icount = eval(argv[2]);
+    }
+    
+    dumpInstructions(iaddr, icount);
     
     return true;
 }
@@ -157,6 +171,16 @@ bool cmdRegisters(unsigned int argc, char **argv)
 bool cmdLabels(unsigned int argc, char **argv)
 {
     listLabels();
+    
+    return true;
+}
+
+bool cmdMemory(unsigned int argc, char **argv)
+{
+    if (argc == 3)
+    {
+        dumpMemory(eval(argv[1]), eval(argv[2]));
+    }
     
     return true;
 }
@@ -275,6 +299,10 @@ bool console()
             {
                 active = (*(kCommands[n].cmd))(argc, argv);
             }
+        }
+        else
+        {
+            active = false;
         }
     }
 
